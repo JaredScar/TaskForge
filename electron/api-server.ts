@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import { app as electronApp } from 'electron';
 import type Database from 'better-sqlite3';
 import type { AutomationEngine } from './engine/automation-engine';
 import type { TriggerManager } from './engine/trigger-manager';
@@ -20,8 +21,9 @@ export function startApiServer(
     const auth = req.headers.authorization ?? '';
     const m = /^Bearer\s+(.+)$/i.exec(auth);
     const bearer = m?.[1]?.trim() ?? '';
-    if (isLocalDevRestApiPlaceholder(bearer)) {
-      res.status(401).json({ error: 'Unauthorized' });
+    /* Unpackaged dev only: well-known placeholder works for local curl/scripts. Packaged apps always require the real DB key. */
+    if (!electronApp.isPackaged && isLocalDevRestApiPlaceholder(bearer)) {
+      next();
       return;
     }
     const key = (db.prepare(`SELECT value FROM settings WHERE key = 'api_key'`).get() as { value: string } | undefined)?.value;

@@ -11,8 +11,8 @@ import { LOCAL_DEV_REST_API_KEY_PLACEHOLDER } from '../../core/local-dev-keys';
       <p class="mt-1 text-sm text-tf-muted">Trigger workflows programmatically via REST API</p>
       @if (!ipc.isElectron) {
         <p class="mt-2 text-xs text-amber-200/90">
-          Browser preview: the key below is a <strong>dummy</strong> for layout only. The local server rejects it; use Electron for a real
-          <code class="text-[11px]">tf_live_…</code> key.
+          Browser preview: the key below is a <strong>dummy</strong> for layout. With <strong>unpackaged</strong> Electron, the same value works for
+          <code class="text-[11px]">curl</code> to <code class="text-[11px]">127.0.0.1:38474</code>; packaged builds use the real key from SQLite.
         </p>
       }
       <div class="mt-6 rounded-xl border border-tf-border bg-tf-card p-4">

@@ -6,6 +6,8 @@ Modern desktop automation for Windows — a **Task Scheduler–style** app with 
 
 TaskForge desktop app (v2.1.0).
 
+### Core (Free tier)
+
 | Workflows | Triggers |
 |:---:|:---:|
 | ![TaskForge — Workflows empty state and sidebar](docs/screenshots/workflows.png) | ![TaskForge — Triggers, Basic and Advanced (Pro)](docs/screenshots/triggers.png) |
@@ -18,7 +20,31 @@ TaskForge desktop app (v2.1.0).
 |:---:|
 | ![TaskForge — Settings, license and preferences](docs/screenshots/settings.png) |
 
-The **Free** tier includes core automation (workflows, basic triggers/actions, logs, settings). **Pro** and **Enterprise** features (AI Assistant, Variables, Marketplace, Analytics, Team, API Access, Audit Logs, advanced triggers/actions) require an **organization license key**; see [`PLAN.md`](PLAN.md) §20 for the entitlement and optional online validation design.
+### Pro features
+
+Unlocked with an **organization license key** (see [`PLAN.md`](PLAN.md) §20). Screenshots also show **advanced** trigger/action catalog entries available in Pro.
+
+| AI Workflow Assistant | Variables |
+|:---:|:---:|
+| ![TaskForge Pro — AI Workflow Assistant](docs/screenshots/pro-ai-assistant.png) | ![TaskForge Pro — Variables](docs/screenshots/pro-variables.png) |
+
+| Marketplace (templates) | Analytics dashboard |
+|:---:|:---:|
+| ![TaskForge Pro — Marketplace](docs/screenshots/pro-marketplace.png) | ![TaskForge Pro — Analytics](docs/screenshots/pro-analytics.png) |
+
+### Enterprise features
+
+Same license tier as Pro for IPC unlock; **Team**, **API Access**, and **Audit Logs** are grouped under Enterprise in the app.
+
+| Team management | API Access (local REST) |
+|:---:|:---:|
+| ![TaskForge Enterprise — Team](docs/screenshots/enterprise-team.png) | ![TaskForge Enterprise — API Access](docs/screenshots/enterprise-api-access.png) |
+
+| Audit logs |
+|:---:|
+| ![TaskForge Enterprise — Audit logs](docs/screenshots/enterprise-audit-logs.png) |
+
+The **Free** tier includes core automation (workflows, basic triggers/actions, logs, settings). **Pro** and **Enterprise** capabilities (AI Assistant, Variables, Marketplace, Analytics, Team, API Access, Audit Logs, advanced triggers/actions) require an **organization license key**; see [`PLAN.md`](PLAN.md) §20 for entitlement and optional online validation.
 
 ## Stack
 
@@ -43,7 +69,7 @@ The **Free** tier includes core automation (workflows, basic triggers/actions, l
 
 1. Install dependencies: `npm install` (runs `@electron/rebuild` for `better-sqlite3` via the `electron-rebuild` CLI).
 2. Run `npm run electron:dev` — wait for the UI, then use the app.
-3. **`npm start` (Angular only):** Settings and API Access show **dummy keys** for UI layout (`src/app/core/local-dev-keys.ts`). They are not sent to OpenAI and are **rejected** by the real local REST server if pasted into `curl`. Use Electron for working keys.
+3. **`npm start` (Angular only):** Settings and API Access show **dummy keys** for UI layout (`src/app/core/local-dev-keys.ts`). They are not sent to OpenAI. The REST placeholder authenticates **unpackaged** Electron only (`npm run electron` / `electron:dev`); **packaged** installs require the real `tf_live_…` key from the database.
 4. Data file: `%APPDATA%/TaskForge/taskforge.db` (Electron `userData`, after packaging with `productName` **TaskForge**). Upgrading from the pre-rename app: the first launch copies `autodesk.db` from legacy `%APPDATA%/AutoDesk` or `%APPDATA%/autodesk` if the new database is missing.
 
 If the window never opens and the console shows `NODE_MODULE_VERSION` / “compiled against a different Node.js version”, run `npm run rebuild:native` so the native module matches Electron (not your system Node).
