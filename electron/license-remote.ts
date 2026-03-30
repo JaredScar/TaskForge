@@ -17,14 +17,14 @@ export const LICENSE_OFFLINE_GRACE_SEC_KEY = 'license_offline_grace_sec';
 export type LicenseMode = 'local' | 'hybrid' | 'online_strict';
 
 export function getLicenseMode(): LicenseMode {
-  const m = (process.env.TASKFORGE_LICENSE_MODE ?? process.env.AUTODESK_LICENSE_MODE ?? 'local').toLowerCase();
+  const m = (process.env.TASKFORGE_LICENSE_MODE ?? 'local').toLowerCase();
   if (m === 'hybrid' || m === 'online_strict') return m;
   return 'local';
 }
 
 /** Base URL for §20.9 license API; only `https` allowed in production path. */
 export function getLicenseApiUrl(): string | undefined {
-  const u = (process.env.TASKFORGE_LICENSE_API_URL ?? process.env.AUTODESK_LICENSE_API_URL)?.trim();
+  const u = process.env.TASKFORGE_LICENSE_API_URL?.trim();
   if (!u) return undefined;
   if (!/^https:\/\//i.test(u)) return undefined;
   return u.replace(/\/$/, '');

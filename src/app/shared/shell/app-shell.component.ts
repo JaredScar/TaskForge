@@ -6,6 +6,7 @@ import { ToastService } from '../../core/services/toast.service';
 import { ConfirmDialogService } from '../../core/services/confirm-dialog.service';
 import { HotkeysService } from '../../core/services/hotkeys.service';
 import type { ToastLevel } from '../../core/services/toast.service';
+import { LEGACY_ONBOARDING_DONE_STORAGE_KEY } from '../../core/legacy-onboarding-key';
 
 @Component({
   selector: 'app-shell',
@@ -36,6 +37,7 @@ export class AppShellComponent implements OnInit, OnDestroy {
   private timer: ReturnType<typeof setInterval> | null = null;
 
   async ngOnInit(): Promise<void> {
+    this.migrateLegacyOnboardingKey();
     await this.refreshCounts();
     await this.maybeOnboarding();
     this.timer = setInterval(() => void this.refreshCounts(), 5000);
@@ -87,14 +89,26 @@ export class AppShellComponent implements OnInit, OnDestroy {
     }
   }
 
+  private migrateLegacyOnboardingKey(): void {
+    if (typeof localStorage === 'undefined') return;
+    try {
+      const v = localStorage.getItem(LEGACY_ONBOARDING_DONE_STORAGE_KEY);
+      if (v != null) {
+        localStorage.setItem('taskforge_onboarding_done', v);
+        localStorage.removeItem(LEGACY_ONBOARDING_DONE_STORAGE_KEY);
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
   private async maybeOnboarding(): Promise<void> {
     try {
       const path = this.router.url.split('?')[0];
       if (path !== '/' && path !== '/workflows') return;
       const list = await this.ipc.api.workflows.list();
       if (list.length > 0) return;
-      if (typeof localStorage !== 'undefined' && (localStorage.getItem('taskforge_onboarding_done') || localStorage.getItem('autodesk_onboarding_done')))
-        return;
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('taskforge_onboarding_done')) return;
       await this.router.navigate(['/onboarding']);
     } catch {
       /* ignore */

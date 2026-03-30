@@ -867,18 +867,18 @@ npm install chart.js ng2-charts
 
 **Payload expiry:** If the decoded JSON payload includes numeric **`exp`** (Unix seconds), the key is rejected after that time (§20.8 key expiry — implemented client-side).
 
-**Key format:** `adent1.<base64urlPayload>.<base64urlHMAC>`
+**Key format:** `tfent1.<base64urlPayload>.<base64urlHMAC>`
 
-- `adent1` — fixed prefix; identifies the key type and version.
+- `tfent1` — current fixed prefix; identifies the key type and version. The legacy three-part prefix from pre-rename builds is still accepted if the HMAC is valid.
 - `<base64urlPayload>` — base64url-encoded JSON, e.g. `{"v":1,"tier":"pro_enterprise"}`.
-- `<base64urlHMAC>` — HMAC-SHA256 of the payload string, keyed with `TASKFORGE_ENTITLEMENT_SECRET` (env var; defaults to a dev secret for local builds).
+- `<base64urlHMAC>` — HMAC-SHA256 of the payload string, keyed with `TASKFORGE_ENTITLEMENT_SECRET` (env var). If unset, the app tries the current dev default and the legacy dev secret from `electron/legacy-paths.ts` so older signed keys still validate locally.
 
 Validation uses `timingSafeEqual` to prevent timing attacks. The key `local-dev-pro-enterprise` is also accepted as a dev bypass (not for distribution).
 
 **Generating a key (dev):**
 ```bash
 node scripts/generate-entitlement-key.mjs
-# adent1.eyJ2IjoxLCJ0aWVyIjoicHJvX2VudGVycHJpc2UifQ.xxxx
+# tfent1.eyJ2IjoxLCJ0aWVyIjoicHJvX2VudGVycHJpc2UifQ.xxxx
 ```
 
 **For signed production keys**, set `TASKFORGE_ENTITLEMENT_SECRET` to a secret known only to you, then run the same script. Anyone who clones the repo uses the default dev secret, which produces keys that only validate with that same default — they cannot forge keys signed with your production secret.
@@ -1030,7 +1030,7 @@ Request JSON (example):
 
 ```json
 {
-  "license_key": "adent1....",
+  "license_key": "tfent1....",
   "organization_id": "<optional org slug or UUID from checkout>",
   "device_id": "<uuid from settings>",
   "app_version": "2.1.0",

@@ -70,9 +70,11 @@ The **Free** tier includes core automation (workflows, basic triggers/actions, l
 1. Install dependencies: `npm install` (runs `@electron/rebuild` for `better-sqlite3` via the `electron-rebuild` CLI).
 2. Run `npm run electron:dev` — wait for the UI, then use the app.
 3. **`npm start` (Angular only):** Settings and API Access show **dummy keys** for UI layout (`src/app/core/local-dev-keys.ts`). They are not sent to OpenAI. The REST placeholder authenticates **unpackaged** Electron only (`npm run electron` / `electron:dev`); **packaged** installs require the real `tf_live_…` key from the database.
-4. Data file: `%APPDATA%/TaskForge/taskforge.db` (Electron `userData`, after packaging with `productName` **TaskForge**). Upgrading from the pre-rename app: the first launch copies `autodesk.db` from legacy `%APPDATA%/AutoDesk` or `%APPDATA%/autodesk` if the new database is missing.
+4. Data file: `%APPDATA%/TaskForge/taskforge.db` (Electron `userData`). If you upgraded from an older install, SQLite may be copied once from the legacy paths defined in [`electron/legacy-paths.ts`](electron/legacy-paths.ts) (historical `%APPDATA%` folder names on disk).
 
 If the window never opens and the console shows `NODE_MODULE_VERSION` / “compiled against a different Node.js version”, run `npm run rebuild:native` so the native module matches Electron (not your system Node).
+
+**Legacy strings:** [`electron/legacy-paths.ts`](electron/legacy-paths.ts) and [`src/app/core/legacy-onboarding-key.ts`](src/app/core/legacy-onboarding-key.ts) are the only places that still embed historical folder names, SQLite filenames, `localStorage` keys, email, or dev HMAC material from pre-TaskForge installs. They exist so migrations keep working; everything else uses TaskForge naming.
 
 ## Auto-updates
 
@@ -102,5 +104,5 @@ Copyright © 2026 Jared Scarito.
 ### Publishing on GitHub — checklist
 
 - **Build:** `npm run build && npm run build:electron` should pass.
-- **Secrets:** Do not commit production `TASKFORGE_ENTITLEMENT_SECRET` (legacy `AUTODESK_ENTITLEMENT_SECRET` is still read for compatibility), API keys, or signing certificates; use CI secrets for release builds.
+- **Secrets:** Do not commit production `TASKFORGE_ENTITLEMENT_SECRET`, API keys, or signing certificates; use CI secrets for release builds.
 - **Plan vs UI:** The app references “PLAN.md §20” in the sidebar; keeping `PLAN.md` in the repo keeps that accurate for contributors.

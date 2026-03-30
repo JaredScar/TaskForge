@@ -3,6 +3,11 @@ import * as path from 'node:path';
 import { app } from 'electron';
 import { randomUUID } from 'node:crypto';
 import type BetterSqlite3 from 'better-sqlite3';
+import {
+  LEGACY_ROAMING_SQLITE_BASENAME,
+  LEGACY_ROAMING_USERDATA_DIR_NAMES,
+  LEGACY_SELF_TEAM_EMAIL,
+} from '../legacy-paths';
 
 /** Lazy require so ABI errors can be caught in main (not at module load). */
 function loadBetterSqlite3(): typeof BetterSqlite3 {
@@ -61,6 +66,8 @@ function ensureAppDefaults(db: InstanceType<typeof BetterSqlite3>): void {
     db.prepare(`INSERT INTO settings (key, value) VALUES ('api_key', ?)`).run(key);
   }
 
+  db.prepare(`UPDATE team_members SET email = ? WHERE is_self = 1 AND email = ?`).run('local@taskforge.app', LEGACY_SELF_TEAM_EMAIL);
+
   const hasSelf = db.prepare(`SELECT 1 FROM team_members WHERE is_self = 1`).get();
   if (!hasSelf) {
     db.prepare(
@@ -85,9 +92,9 @@ function migrateLegacySqliteIfNeeded(userData: string): void {
   if (fs.existsSync(newDb)) return;
 
   const parent = path.dirname(userData);
-  const legacyDirs = [path.join(parent, 'AutoDesk'), path.join(parent, 'autodesk')];
-  for (const legacyDir of legacyDirs) {
-    const oldDb = path.join(legacyDir, 'autodesk.db');
+  for (const dirName of LEGACY_ROAMING_USERDATA_DIR_NAMES) {
+    const legacyDir = path.join(parent, dirName);
+    const oldDb = path.join(legacyDir, LEGACY_ROAMING_SQLITE_BASENAME);
     if (!fs.existsSync(oldDb)) continue;
     fs.mkdirSync(userData, { recursive: true });
     for (const ext of ['', '-wal', '-shm'] as const) {
