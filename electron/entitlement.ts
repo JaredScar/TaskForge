@@ -12,7 +12,15 @@ export const DEV_ENTITLEMENT_BYPASS = 'local-dev-pro-enterprise';
 /** Current prefix; legacy prefix still accepted for older signed keys (see `legacy-paths.ts`). */
 const KEY_PREFIXES = new Set(['tfent1', 'adent1']);
 
-export const PRO_TRIGGER_KINDS = new Set(['network_change', 'file_change', 'cpu_memory_usage', 'device_connected']);
+export const PRO_TRIGGER_KINDS = new Set([
+  'network_change',
+  'file_change',
+  'cpu_memory_usage',
+  'device_connected',
+  'idle_trigger',
+  'memory_trigger',
+  'device_trigger',
+]);
 export const PRO_ACTION_KINDS = new Set(['run_script', 'http_request']);
 
 function entitlementSecretCandidates(): readonly string[] {

@@ -17,6 +17,9 @@ const ADVANCED: TriggerItem[] = [
   { kind: 'file_change', title: 'File Change', desc: 'Monitor file or folder modifications', icon: '📁', pro: true },
   { kind: 'cpu_memory_usage', title: 'CPU/Memory Usage', desc: 'Trigger on resource thresholds', icon: '💾', pro: true },
   { kind: 'device_connected', title: 'Device Connected', desc: 'Headphones or USB (polled)', icon: '🎧', pro: true },
+  { kind: 'idle_trigger', title: 'User idle', desc: 'After keyboard/mouse idle time', icon: '💤', pro: true },
+  { kind: 'memory_trigger', title: 'Memory usage', desc: 'RAM percent above or below threshold', icon: '🧠', pro: true },
+  { kind: 'device_trigger', title: 'USB change', desc: 'When USB device count changes', icon: '🔌', pro: true },
 ];
 
 @Component({

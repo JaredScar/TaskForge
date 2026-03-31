@@ -155,6 +155,7 @@ export class IpcService {
           },
         }),
         getRunsByWorkflow: async () => [],
+        getRunsTimeSeries: async () => [],
         getSystemHealth: async () => ({ cpu: 0, memory: 0, queue: 0, storageGb: 0 }),
       },
       engine: {
@@ -184,7 +185,10 @@ export class IpcService {
         getKey: async () => LOCAL_DEV_REST_API_KEY_PLACEHOLDER,
         regenerateKey: async () => LOCAL_DEV_REST_API_KEY_PLACEHOLDER,
       },
-      marketplace: { list: async () => [...MOCK_MARKETPLACE_LIST], install: async () => null },
+      marketplace: {
+        list: async () => MOCK_MARKETPLACE_LIST.map((m) => ({ ...m, installedCount: 0 })),
+        install: async () => null,
+      },
       ai: {
         parse: async (prompt) => ({
           name: (prompt.trim().slice(0, 56) || 'Untitled draft').replace(/\s+$/, ''),

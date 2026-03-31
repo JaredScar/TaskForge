@@ -57,6 +57,11 @@ import { LOCAL_DEV_REST_API_KEY_PLACEHOLDER } from '../../core/local-dev-keys';
               <td class="p-2 font-mono">/v1/logs/:id</td>
               <td class="p-2">Log detail with steps</td>
             </tr>
+            <tr class="border-b border-tf-border/60">
+              <td class="p-2 font-mono">GET</td>
+              <td class="p-2 font-mono">/v1/variables</td>
+              <td class="p-2">Non-secret variables (id, name, type, value, scope)</td>
+            </tr>
             <tr>
               <td class="p-2 font-mono">POST</td>
               <td class="p-2 font-mono">/v1/workflows/run</td>

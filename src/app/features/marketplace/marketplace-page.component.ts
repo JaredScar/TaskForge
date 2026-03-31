@@ -3,8 +3,16 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { IpcService } from '../../core/services/ipc.service';
 import { ToastService } from '../../core/services/toast.service';
+import { ConfirmDialogService } from '../../core/services/confirm-dialog.service';
 
-type MarketplaceItem = { id: string; title: string; author: string; description: string; pro: boolean };
+type MarketplaceItem = {
+  id: string;
+  title: string;
+  author: string;
+  description: string;
+  pro: boolean;
+  installedCount: number;
+};
 
 @Component({
   selector: 'app-marketplace-page',
@@ -27,11 +35,16 @@ type MarketplaceItem = { id: string; title: string; author: string; description:
       <div class="mt-6 grid gap-4 md:grid-cols-2">
         @for (item of filtered(); track item.id) {
           <div class="rounded-xl border border-tf-border bg-tf-card p-5">
-            <div class="flex items-start justify-between">
+            <div class="flex items-start justify-between gap-2">
               <span class="text-3xl">📦</span>
-              @if (item.pro) {
-                <span class="rounded bg-tf-green/20 px-2 py-0.5 text-[10px] text-tf-green">Pro</span>
-              }
+              <div class="flex flex-wrap justify-end gap-1">
+                @if (item.installedCount > 0) {
+                  <span class="rounded bg-blue-500/20 px-2 py-0.5 text-[10px] text-blue-200">Installed ×{{ item.installedCount }}</span>
+                }
+                @if (item.pro) {
+                  <span class="rounded bg-tf-green/20 px-2 py-0.5 text-[10px] text-tf-green">Pro</span>
+                }
+              </div>
             </div>
             <h2 class="mt-3 font-semibold">{{ item.title }}</h2>
             <p class="text-xs text-tf-muted">{{ item.author }}</p>
@@ -54,10 +67,15 @@ export class MarketplacePageComponent implements OnInit {
   private readonly ipc = inject(IpcService);
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
+  private readonly confirmDialog = inject(ConfirmDialogService);
   protected readonly items = signal<MarketplaceItem[]>([]);
   protected readonly q = signal('');
 
   async ngOnInit(): Promise<void> {
+    await this.reload();
+  }
+
+  private async reload(): Promise<void> {
     this.items.set(await this.ipc.api.marketplace.list());
   }
 
@@ -67,9 +85,19 @@ export class MarketplacePageComponent implements OnInit {
   }
 
   async install(id: string): Promise<void> {
+    const item = this.items().find((i) => i.id === id);
+    if (item && item.installedCount > 0) {
+      const ok = await this.confirmDialog.confirm({
+        title: 'Install again?',
+        message: 'This creates another workflow copy from the same template.',
+        confirmLabel: 'Install copy',
+      });
+      if (!ok) return;
+    }
     const newId = await this.ipc.api.marketplace.install(id);
     if (newId) {
       this.toast.success('Template installed — opening builder');
+      await this.reload();
       void this.router.navigate(['/builder', newId]);
     } else {
       this.toast.warning('Install needs the TaskForge desktop app (Electron).');

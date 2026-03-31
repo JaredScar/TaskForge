@@ -112,6 +112,18 @@ import { ToastService } from '../../core/services/toast.service';
           <input type="checkbox" [(ngModel)]="notifyDesktop" />
           Desktop notifications for workflow events
         </label>
+        <label class="mt-4 block text-xs text-tf-muted">Max concurrent workflow runs (stored for future engine use)</label>
+        <input
+          type="number"
+          min="1"
+          max="50"
+          [(ngModel)]="maxConcurrentWorkflows"
+          class="mt-1 w-full rounded-lg border border-tf-border bg-tf-bg px-3 py-2 text-sm"
+        />
+        <label class="mt-4 flex items-center gap-2 text-sm text-neutral-200">
+          <input type="checkbox" [(ngModel)]="confirmDeleteWorkflow" />
+          Confirm before deleting workflows
+        </label>
         <button type="button" (click)="savePrefs()" class="mt-4 rounded-lg bg-tf-green px-4 py-2 text-sm font-medium text-black">
           Save preferences
         </button>
@@ -132,6 +144,8 @@ export class SettingsPageComponent implements OnInit {
   protected logRetentionDays = 30;
   protected engineAutoStart = true;
   protected notifyDesktop = true;
+  protected maxConcurrentWorkflows = 5;
+  protected confirmDeleteWorkflow = true;
   protected readonly savedKey = signal(false);
   protected readonly savedPrefs = signal(false);
   protected readonly showUnlockBanner = signal(false);
@@ -157,6 +171,10 @@ export class SettingsPageComponent implements OnInit {
     if (ea != null) this.engineAutoStart = ea === '1' || ea === 'true';
     const nd = await this.ipc.api.settings.get('notify_desktop');
     if (nd != null) this.notifyDesktop = nd === '1' || nd === 'true';
+    const mc = await this.ipc.api.settings.get('max_concurrent_workflows');
+    if (mc != null && mc !== '') this.maxConcurrentWorkflows = Math.min(50, Math.max(1, parseInt(mc, 10) || 5));
+    const cd = await this.ipc.api.settings.get('confirm_delete_workflow');
+    if (cd != null) this.confirmDeleteWorkflow = cd === '1' || cd === 'true';
   }
 
   async saveEntitlement(): Promise<void> {
@@ -204,6 +222,8 @@ export class SettingsPageComponent implements OnInit {
     await this.ipc.api.settings.set('log_retention_days', String(this.logRetentionDays));
     await this.ipc.api.settings.set('engine_auto_start', this.engineAutoStart ? '1' : '0');
     await this.ipc.api.settings.set('notify_desktop', this.notifyDesktop ? '1' : '0');
+    await this.ipc.api.settings.set('max_concurrent_workflows', String(this.maxConcurrentWorkflows));
+    await this.ipc.api.settings.set('confirm_delete_workflow', this.confirmDeleteWorkflow ? '1' : '0');
     this.savedPrefs.set(true);
     this.toast.success('Preferences saved');
     setTimeout(() => this.savedPrefs.set(false), 2000);

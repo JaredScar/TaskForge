@@ -7,7 +7,7 @@ import type { AutomationEngine } from './engine/automation-engine';
 import type { TriggerManager } from './engine/trigger-manager';
 import { MARKETPLACE_ITEMS } from './marketplace-data';
 import { writeAuditLog } from './db/audit';
-import { defaultActionConfig, defaultTriggerConfig, stubTimeTriggerConfig } from './catalog-starters';
+import { defaultActionConfig, defaultConditionConfig, defaultTriggerConfig, stubTimeTriggerConfig } from './catalog-starters';
 import {
   assertProEnterprise,
   EntitlementRequiredError,
@@ -125,7 +125,7 @@ export function registerIpcHandlers(
 
   ipcMain.handle(
     'workflows:update',
-    (_e, payload: { id: string; name?: string; description?: string; priority?: string; tags?: string[]; draft?: boolean; nodes?: unknown[]; edges?: unknown[] }) => {
+    (_e, payload: { id: string; name?: string; description?: string; priority?: string; tags?: string[]; draft?: boolean; concurrency?: string; nodes?: unknown[]; edges?: unknown[] }) => {
       const now = new Date().toISOString();
       const cur = db.prepare(`SELECT * FROM workflows WHERE id = ?`).get(payload.id) as Record<string, unknown> | undefined;
       if (!cur) return false;
@@ -136,14 +136,17 @@ export function registerIpcHandlers(
       ) {
         throw new EntitlementRequiredError();
       }
+      const conc =
+        payload.concurrency != null && ['allow', 'queue', 'skip'].includes(payload.concurrency) ? payload.concurrency : null;
       db.prepare(
-        `UPDATE workflows SET name = COALESCE(?, name), description = COALESCE(?, description), priority = COALESCE(?, priority), tags = COALESCE(?, tags), draft = COALESCE(?, draft), updated_at = ? WHERE id = ?`
+        `UPDATE workflows SET name = COALESCE(?, name), description = COALESCE(?, description), priority = COALESCE(?, priority), tags = COALESCE(?, tags), draft = COALESCE(?, draft), concurrency = COALESCE(?, concurrency), updated_at = ? WHERE id = ?`
       ).run(
         payload.name ?? null,
         payload.description ?? null,
         payload.priority ?? null,
         payload.tags != null ? JSON.stringify(payload.tags) : null,
         payload.draft != null ? (payload.draft ? 1 : 0) : null,
+        conc,
         now,
         payload.id
       );
@@ -214,9 +217,10 @@ export function registerIpcHandlers(
     const now = new Date().toISOString();
     const baseName = String(wf['name'] ?? 'Workflow');
     const name = `Copy of ${baseName}`.slice(0, 200);
+    const conc = String(wf['concurrency'] ?? 'allow');
     db.prepare(
-      `INSERT INTO workflows (id, name, description, enabled, priority, tags, draft, run_count, last_run_at, last_run_summary, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, 1, 0, NULL, NULL, ?, ?)`
+      `INSERT INTO workflows (id, name, description, enabled, priority, tags, draft, run_count, last_run_at, last_run_summary, created_at, updated_at, source_template_id, concurrency)
+       VALUES (?, ?, ?, ?, ?, ?, 1, 0, NULL, NULL, ?, ?, NULL, ?)`
     ).run(
       newId,
       name,
@@ -225,7 +229,8 @@ export function registerIpcHandlers(
       String(wf['priority'] ?? 'normal'),
       String(wf['tags'] ?? '[]'),
       now,
-      now
+      now,
+      ['allow', 'queue', 'skip'].includes(conc) ? conc : 'allow'
     );
     const nodes = db
       .prepare(`SELECT * FROM workflow_nodes WHERE workflow_id = ? ORDER BY sort_order`)
@@ -319,7 +324,7 @@ export function registerIpcHandlers(
       let configObj: Record<string, unknown>;
       if (payload.nodeType === 'trigger') configObj = defaultTriggerConfig(payload.kind);
       else if (payload.nodeType === 'action') configObj = defaultActionConfig(payload.kind);
-      else configObj = { label: payload.kind };
+      else configObj = defaultConditionConfig(payload.kind);
       db.prepare(
         `INSERT INTO workflow_nodes (id, workflow_id, node_type, kind, config, position_x, position_y, sort_order) VALUES (?, ?, ?, ?, ?, 0, 0, ?)`
       ).run(randomUUID(), payload.workflowId, payload.nodeType, payload.kind, JSON.stringify(configObj), next);
@@ -330,8 +335,14 @@ export function registerIpcHandlers(
     }
   );
 
-  ipcMain.handle('logs:list', (_e, opts?: { limit?: number }) => {
+  ipcMain.handle('logs:list', (_e, opts?: { limit?: number; workflowId?: string }) => {
     const lim = opts?.limit ?? 200;
+    const wf = opts?.workflowId?.trim();
+    if (wf) {
+      return db
+        .prepare(`SELECT * FROM execution_logs WHERE workflow_id = ? ORDER BY started_at DESC LIMIT ?`)
+        .all(wf, lim);
+    }
     return db.prepare(`SELECT * FROM execution_logs ORDER BY started_at DESC LIMIT ?`).all(lim);
   });
 
@@ -426,7 +437,7 @@ export function registerIpcHandlers(
     return true;
   });
 
-  ipcMain.handle('analytics:summary', () => {
+  ipcMain.handle('analytics:summary', (_e, opts?: { rangeDays?: number }) => {
     if (!isProEnterpriseUnlocked(db)) {
       return {
         totalRuns: 0,
@@ -441,69 +452,65 @@ export function registerIpcHandlers(
         },
       };
     }
-    const totalRuns = (db.prepare(`SELECT SUM(run_count) as s FROM workflows`).get() as { s: number | null }).s ?? 0;
-    const successRow = db.prepare(`SELECT COUNT(*) as c FROM execution_logs WHERE status = 'success'`).get() as { c: number };
-    const failRow = db.prepare(`SELECT COUNT(*) as c FROM execution_logs WHERE status = 'failure'`).get() as { c: number };
+    const nd = Math.min(365, Math.max(1, Math.floor(opts?.rangeDays ?? 7)));
+    const curr = `datetime(started_at) >= datetime('now', '-${nd} days')`;
+    const prev = `datetime(started_at) >= datetime('now', '-${nd * 2} days') AND datetime(started_at) < datetime('now', '-${nd} days')`;
+    const touchedCurrClause = `datetime(updated_at) >= datetime('now', '-${nd} days')`;
+    const touchedPrevClause = `datetime(updated_at) >= datetime('now', '-${nd * 2} days') AND datetime(updated_at) < datetime('now', '-${nd} days')`;
+
+    const logCount = (where: string) => (db.prepare(`SELECT COUNT(*) as c FROM execution_logs WHERE ${where}`).get() as { c: number }).c;
+    const totalRuns = logCount(curr);
+    const successRow = db.prepare(`SELECT COUNT(*) as c FROM execution_logs WHERE status = 'success' AND ${curr}`).get() as { c: number };
+    const failRow = db.prepare(`SELECT COUNT(*) as c FROM execution_logs WHERE status = 'failure' AND ${curr}`).get() as { c: number };
     const done = successRow.c + failRow.c || 1;
     const successRate = (successRow.c / done) * 100;
     const avgRow = db
       .prepare(
-        `SELECT AVG(CAST((julianday(finished_at) - julianday(started_at)) * 86400000 AS INTEGER)) as a FROM execution_logs WHERE finished_at IS NOT NULL`
+        `SELECT AVG(CAST((julianday(finished_at) - julianday(started_at)) * 86400000 AS INTEGER)) as a FROM execution_logs WHERE finished_at IS NOT NULL AND ${curr}`
       )
       .get() as { a: number | null };
     const active = (db.prepare(`SELECT COUNT(*) as c FROM workflows WHERE enabled = 1`).get() as { c: number }).c;
 
-    const logCount = (sql: string) => (db.prepare(sql).get() as { c: number }).c;
-    const runsCurr = logCount(
-      `SELECT COUNT(*) as c FROM execution_logs WHERE datetime(started_at) >= datetime('now', '-7 days')`
-    );
-    const runsPrev = logCount(
-      `SELECT COUNT(*) as c FROM execution_logs WHERE datetime(started_at) >= datetime('now', '-14 days') AND datetime(started_at) < datetime('now', '-7 days')`
-    );
+    const runsCurr = logCount(curr);
+    const runsPrev = logCount(prev);
 
-    const rate = (from: string) => {
+    const rate = (where: string) => {
       const row = db
         .prepare(
           `SELECT 
             SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) as ok,
             SUM(CASE WHEN status IN ('success','failure') THEN 1 ELSE 0 END) as tot
-           FROM execution_logs WHERE ${from}`
+           FROM execution_logs WHERE ${where}`
         )
         .get() as { ok: number | null; tot: number | null };
       const t = row.tot ?? 0;
       if (t === 0) return 0;
       return ((row.ok ?? 0) / t) * 100;
     };
-    const successCurr = rate(`datetime(started_at) >= datetime('now', '-7 days')`);
-    const successPrev = rate(
-      `datetime(started_at) >= datetime('now', '-14 days') AND datetime(started_at) < datetime('now', '-7 days')`
-    );
+    const successCurr = rate(curr);
+    const successPrev = rate(prev);
 
-    const avgMs = (from: string) =>
+    const avgMs = (where: string) =>
       (
         db
           .prepare(
             `SELECT AVG(CAST((julianday(finished_at) - julianday(started_at)) * 86400000 AS REAL)) as a 
-             FROM execution_logs WHERE finished_at IS NOT NULL AND ${from}`
+             FROM execution_logs WHERE finished_at IS NOT NULL AND ${where}`
           )
           .get() as { a: number | null }
       ).a;
 
-    const avgCurr = avgMs(`datetime(started_at) >= datetime('now', '-7 days')`);
-    const avgPrev = avgMs(
-      `datetime(started_at) >= datetime('now', '-14 days') AND datetime(started_at) < datetime('now', '-7 days')`
-    );
+    const avgCurr = avgMs(curr);
+    const avgPrev = avgMs(prev);
 
-    const touchedCurr = logCount(`SELECT COUNT(*) as c FROM workflows WHERE datetime(updated_at) >= datetime('now', '-7 days')`);
-    const touchedPrev = logCount(
-      `SELECT COUNT(*) as c FROM workflows WHERE datetime(updated_at) >= datetime('now', '-14 days') AND datetime(updated_at) < datetime('now', '-7 days')`
-    );
+    const touchedCurr = (db.prepare(`SELECT COUNT(*) as c FROM workflows WHERE ${touchedCurrClause}`).get() as { c: number }).c;
+    const touchedPrev = (db.prepare(`SELECT COUNT(*) as c FROM workflows WHERE ${touchedPrevClause}`).get() as { c: number }).c;
 
     const pctChange = (curr: number, prev: number): { label: string; trend: 'up' | 'down' | 'flat'; favorable: boolean } => {
-      if (prev === 0 && curr === 0) return { label: 'No runs last week', trend: 'flat', favorable: true };
+      if (prev === 0 && curr === 0) return { label: 'No runs in window', trend: 'flat', favorable: true };
       if (prev === 0)
         return {
-          label: curr > 0 ? 'New activity this week' : 'No prior week data',
+          label: curr > 0 ? 'New activity vs prior window' : 'No prior window data',
           trend: curr > 0 ? 'up' : 'flat',
           favorable: true,
         };
@@ -511,7 +518,7 @@ export function registerIpcHandlers(
       const rounded = Math.round(pct * 10) / 10;
       const trend: 'up' | 'down' | 'flat' = Math.abs(pct) < 1 ? 'flat' : pct > 0 ? 'up' : 'down';
       return {
-        label: `${rounded >= 0 ? '+' : ''}${rounded}% vs prior week`,
+        label: `${rounded >= 0 ? '+' : ''}${rounded}% vs prior ${nd}d`,
         trend,
         favorable: trend === 'up' || trend === 'flat',
       };
@@ -521,7 +528,7 @@ export function registerIpcHandlers(
       const d = Math.round((curr - prev) * 10) / 10;
       const trend: 'up' | 'down' | 'flat' = d > 0.5 ? 'up' : d < -0.5 ? 'down' : 'flat';
       return {
-        label: `${d >= 0 ? '+' : ''}${d} pts vs prior week`,
+        label: `${d >= 0 ? '+' : ''}${d} pts vs prior ${nd}d`,
         trend,
         favorable: trend === 'up' || trend === 'flat',
       };
@@ -535,7 +542,7 @@ export function registerIpcHandlers(
       const d = Math.round((c - p) * 10) / 10;
       const trend: 'up' | 'down' | 'flat' = d < -0.05 ? 'down' : d > 0.05 ? 'up' : 'flat';
       return {
-        label: `${d >= 0 ? '+' : ''}${d}s vs prior week`,
+        label: `${d >= 0 ? '+' : ''}${d}s vs prior ${nd}d`,
         trend,
         favorable: trend === 'down' || trend === 'flat',
       };
@@ -555,9 +562,34 @@ export function registerIpcHandlers(
     };
   });
 
-  ipcMain.handle('analytics:runsByWorkflow', () => {
+  ipcMain.handle('analytics:runsByWorkflow', (_e, opts?: { rangeDays?: number }) => {
     if (!isProEnterpriseUnlocked(db)) return [];
-    return db.prepare(`SELECT id, name, run_count FROM workflows ORDER BY run_count DESC LIMIT 10`).all();
+    const nd = Math.min(365, Math.max(1, Math.floor(opts?.rangeDays ?? 7)));
+    const clause = `datetime(e.started_at) >= datetime('now', '-${nd} days')`;
+    return db
+      .prepare(
+        `SELECT w.id, w.name, COUNT(e.id) as run_count
+         FROM workflows w
+         LEFT JOIN execution_logs e ON e.workflow_id = w.id AND ${clause}
+         GROUP BY w.id
+         ORDER BY run_count DESC
+         LIMIT 10`
+      )
+      .all();
+  });
+
+  ipcMain.handle('analytics:runsTimeSeries', (_e, opts?: { rangeDays?: number }) => {
+    if (!isProEnterpriseUnlocked(db)) return [];
+    const nd = Math.min(365, Math.max(1, Math.floor(opts?.rangeDays ?? 30)));
+    return db
+      .prepare(
+        `SELECT date(started_at) as day, COUNT(*) as count
+         FROM execution_logs
+         WHERE datetime(started_at) >= datetime('now', '-${nd} days')
+         GROUP BY date(started_at)
+         ORDER BY day ASC`
+      )
+      .all();
   });
 
   ipcMain.handle('analytics:systemHealth', async () => {
@@ -670,7 +702,20 @@ export function registerIpcHandlers(
 
   ipcMain.handle('marketplace:list', () => {
     if (!isProEnterpriseUnlocked(db)) return [];
-    return MARKETPLACE_ITEMS.map(({ id, title, author, description, pro }) => ({ id, title, author, description, pro }));
+    const installed = db
+      .prepare(
+        `SELECT source_template_id as id, COUNT(*) as c FROM workflows WHERE source_template_id IS NOT NULL GROUP BY source_template_id`
+      )
+      .all() as { id: string; c: number }[];
+    const map = new Map(installed.map((r) => [r.id, r.c]));
+    return MARKETPLACE_ITEMS.map(({ id, title, author, description, pro }) => ({
+      id,
+      title,
+      author,
+      description,
+      pro,
+      installedCount: map.get(id) ?? 0,
+    }));
   });
 
   ipcMain.handle('marketplace:install', (_e, templateId: string) => {
@@ -680,9 +725,9 @@ export function registerIpcHandlers(
     const id = randomUUID();
     const now = new Date().toISOString();
     db.prepare(
-      `INSERT INTO workflows (id, name, description, enabled, priority, tags, draft, run_count, created_at, updated_at)
-       VALUES (?, ?, ?, 0, 'normal', ?, 1, 0, ?, ?)`
-    ).run(id, item.title, item.description, JSON.stringify(['marketplace']), now, now);
+      `INSERT INTO workflows (id, name, description, enabled, priority, tags, draft, run_count, created_at, updated_at, source_template_id, concurrency)
+       VALUES (?, ?, ?, 0, 'normal', ?, 1, 0, ?, ?, ?, 'allow')`
+    ).run(id, item.title, item.description, JSON.stringify(['marketplace']), now, now, templateId);
     let order = 0;
     const insN = db.prepare(
       `INSERT INTO workflow_nodes (id, workflow_id, node_type, kind, config, position_x, position_y, sort_order) VALUES (?, ?, ?, ?, ?, 0, 0, ?)`
@@ -765,21 +810,95 @@ export function registerIpcHandlers(
 }
 
 function heuristicWorkflowFromPrompt(prompt: string): { name: string; nodes: Array<Record<string, unknown>> } {
+  if (prompt.trim().length < 6) {
+    return {
+      name: 'Need more detail',
+      nodes: [
+        {
+          node_type: 'trigger',
+          kind: 'time_schedule',
+          config: { cron: '0 9 * * *', label: 'Time: 9:00 AM' },
+          sort_order: 0,
+        },
+        {
+          node_type: 'action',
+          kind: 'show_notification',
+          config: {
+            title: 'TaskForge',
+            body: "I didn't understand that — try describing a trigger and an action separately.",
+            label: 'Show Notification',
+          },
+          sort_order: 1,
+        },
+      ],
+    };
+  }
+
   const lower = prompt.toLowerCase();
   const nodes: Array<Record<string, unknown>> = [];
   let order = 0;
-  if (lower.includes('headphone') || lower.includes('device')) {
+
+  if (lower.includes('plug in') || lower.includes('usb') || lower.includes('headphone') || lower.includes('device')) {
     nodes.push({
       node_type: 'trigger',
-      kind: 'device_connected',
-      config: { label: 'Device connected', device: 'audio' },
+      kind: lower.includes('usb') || lower.includes('plug') ? 'device_trigger' : 'device_connected',
+      config: { label: 'Device', device: 'audio', event: 'connect' },
       sort_order: order++,
     });
-  } else if (lower.includes('morning') || lower.includes('every day')) {
+  } else if (lower.includes('idle')) {
+    nodes.push({
+      node_type: 'trigger',
+      kind: 'idle_trigger',
+      config: { idleSeconds: lower.includes('5 min') ? 300 : 600, label: 'When idle' },
+      sort_order: order++,
+    });
+  } else if (lower.includes('memory') || lower.includes('ram')) {
+    nodes.push({
+      node_type: 'trigger',
+      kind: 'memory_trigger',
+      config: { threshold: 85, comparison: 'above', label: 'Memory high' },
+      sort_order: order++,
+    });
+  } else if (lower.includes('midnight') || lower.includes('12 am') || lower.includes('12:00 am')) {
     nodes.push({
       node_type: 'trigger',
       kind: 'time_schedule',
-      config: { cron: '0 9 * * *', label: 'Time: 9:00 AM' },
+      config: { cron: '0 0 * * *', label: 'Daily at midnight' },
+      sort_order: order++,
+    });
+  } else if (lower.includes('startup') || lower.includes('login') || lower.includes('boot')) {
+    nodes.push({
+      node_type: 'trigger',
+      kind: 'system_startup',
+      config: { label: 'On startup' },
+      sort_order: order++,
+    });
+  } else if (lower.includes('wifi') || lower.includes('network') || lower.includes('ssid')) {
+    nodes.push({
+      node_type: 'trigger',
+      kind: 'network_change',
+      config: { ssid: '', label: 'Network change' },
+      sort_order: order++,
+    });
+  } else if (lower.includes('file') && (lower.includes('change') || lower.includes('watch'))) {
+    nodes.push({
+      node_type: 'trigger',
+      kind: 'file_change',
+      config: { path: '', label: 'File change' },
+      sort_order: order++,
+    });
+  } else if (lower.includes('cpu')) {
+    nodes.push({
+      node_type: 'trigger',
+      kind: 'cpu_memory_usage',
+      config: { cpuPercent: 90, memPercent: 95, label: 'CPU high' },
+      sort_order: order++,
+    });
+  } else if (lower.includes('morning') || lower.includes('every day') || lower.includes('weekday')) {
+    nodes.push({
+      node_type: 'trigger',
+      kind: 'time_schedule',
+      config: { cron: lower.includes('weekday') ? '0 9 * * 1-5' : '0 9 * * *', label: 'Time: 9:00 AM' },
       sort_order: order++,
     });
   } else {
@@ -790,11 +909,33 @@ function heuristicWorkflowFromPrompt(prompt: string): { name: string; nodes: Arr
       sort_order: order++,
     });
   }
-  if (lower.includes('spotify') || lower.includes('app')) {
+
+  if (lower.includes('chrome')) {
     nodes.push({
       node_type: 'action',
       kind: 'open_application',
-      config: { path: 'spotify.exe', label: 'Open Application' },
+      config: { path: 'chrome.exe', label: 'Open Chrome' },
+      sort_order: order++,
+    });
+  } else if (lower.includes('script') || lower.includes('powershell') || lower.includes('shell')) {
+    nodes.push({
+      node_type: 'action',
+      kind: 'run_script',
+      config: { path: '', shell: 'powershell', label: 'Run script' },
+      sort_order: order++,
+    });
+  } else if (lower.includes('http') || lower.includes('post ') || lower.includes('request')) {
+    nodes.push({
+      node_type: 'action',
+      kind: 'http_request',
+      config: { method: 'GET', url: 'https://example.com', label: 'HTTP request' },
+      sort_order: order++,
+    });
+  } else if (lower.includes('spotify') || lower.includes('app') || lower.includes('open ')) {
+    nodes.push({
+      node_type: 'action',
+      kind: 'open_application',
+      config: { path: lower.includes('spotify') ? 'spotify.exe' : 'notepad.exe', label: 'Open application' },
       sort_order: order++,
     });
   } else {
@@ -805,5 +946,6 @@ function heuristicWorkflowFromPrompt(prompt: string): { name: string; nodes: Arr
       sort_order: order++,
     });
   }
+
   return { name: 'AI Draft: ' + prompt.slice(0, 40), nodes };
 }

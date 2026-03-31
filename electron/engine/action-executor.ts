@@ -23,12 +23,13 @@ export interface StepResult {
 
 export async function executeActionNode(
   node: WorkflowNodeRow,
-  vars: Record<string, string> = {}
+  vars: Record<string, string> = {},
+  context: Record<string, string> = {}
 ): Promise<StepResult> {
   const start = Date.now();
   let config: Record<string, unknown>;
   try {
-    const raw = interpolateConfigString(node.config, vars);
+    const raw = interpolateConfigString(node.config, vars, context);
     config = JSON.parse(raw) as Record<string, unknown>;
   } catch {
     return { status: 'failure', message: node.kind, durationMs: Date.now() - start, error: 'Invalid JSON config' };

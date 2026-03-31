@@ -8,6 +8,22 @@ import { ConfirmDialogService } from '../../core/services/confirm-dialog.service
 import { EmptyStateComponent } from '../../shared/ui/empty-state/empty-state.component';
 import type { WorkflowDto } from '../../../types/taskforge-window';
 
+interface LogStepRow {
+  step_kind: string;
+  status: string;
+  message: string | null;
+  error: string | null;
+}
+
+interface LastRunDetail {
+  id: string;
+  started_at: string;
+  finished_at: string | null;
+  status: string;
+  message: string | null;
+  steps: LogStepRow[];
+}
+
 @Component({
   selector: 'app-workflows-page',
   imports: [FormsModule, RouterLink, NgClass, TitleCasePipe, EmptyStateComponent],
@@ -119,10 +135,36 @@ import type { WorkflowDto } from '../../../types/taskforge-window';
                 </div>
                 <div class="mt-3 flex flex-wrap gap-2">
                   <a [routerLink]="['/builder', w.id]" class="text-xs text-tf-green hover:underline">Edit in Builder</a>
-                  <button type="button" (click)="runNow(w.id)" class="text-xs text-neutral-400 hover:text-white">Test run</button>
+                  <button type="button" (click)="runNow(w.id)" class="text-xs text-neutral-400 hover:text-white">
+                    @if (runningId() === w.id) {
+                      <span class="inline-block h-3 w-3 animate-spin rounded-full border border-neutral-500 border-t-transparent"></span>
+                    } @else {
+                      Test run
+                    }
+                  </button>
+                  <button type="button" (click)="toggleLastRun(w.id)" class="text-xs text-neutral-400 hover:text-white">
+                    {{ lastRunPanelId() === w.id ? 'Hide last run' : 'View last run' }}
+                  </button>
                   <button type="button" (click)="duplicateWorkflow(w)" class="text-xs text-neutral-400 hover:text-white">Duplicate</button>
                   <button type="button" (click)="remove(w.id)" class="text-xs text-red-400 hover:underline">Delete</button>
                 </div>
+                @if (lastRunPanelId() === w.id) {
+                  <div class="mt-3 rounded-lg border border-tf-border bg-tf-bg p-3 text-xs text-neutral-300">
+                    @if (lastRunDetail(); as lr) {
+                      <p class="font-mono text-[10px] text-tf-muted">{{ lr.started_at }} · {{ lr.status }}</p>
+                      <p class="mt-1">{{ lr.message || '—' }}</p>
+                      @if (lr.steps.length) {
+                        <ul class="mt-2 space-y-1 font-mono text-[10px] text-neutral-500">
+                          @for (s of lr.steps; track $index) {
+                            <li>{{ s.step_kind }} — {{ s.status }} — {{ s.message }}</li>
+                          }
+                        </ul>
+                      }
+                    } @else {
+                      <p class="text-tf-muted">Loading…</p>
+                    }
+                  </div>
+                }
               </article>
             }
           </div>
@@ -158,6 +200,9 @@ export class WorkflowsPageComponent implements OnInit {
   protected readonly searchQuery = signal('');
   protected readonly activeTag = signal('All');
   protected readonly selectedIds = signal<Set<string>>(new Set());
+  protected readonly runningId = signal<string | null>(null);
+  protected readonly lastRunPanelId = signal<string | null>(null);
+  protected readonly lastRunDetail = signal<LastRunDetail | null>(null);
 
   /** Tag chips derived from workflows only (no hardcoded demo tags). */
   protected readonly tagFilters = computed(() => {
@@ -239,12 +284,15 @@ export class WorkflowsPageComponent implements OnInit {
   async bulkDelete(): Promise<void> {
     const ids = [...this.selectedIds()];
     if (ids.length === 0) return;
-    const ok = await this.confirmDialog.confirm({
-      title: 'Delete workflows',
-      message: `Delete ${ids.length} workflow(s)? This cannot be undone.`,
-      confirmLabel: 'Delete all',
-    });
-    if (!ok) return;
+    const skip = (await this.ipc.api.settings.get('confirm_delete_workflow')) === '0';
+    if (!skip) {
+      const ok = await this.confirmDialog.confirm({
+        title: 'Delete workflows',
+        message: `Delete ${ids.length} workflow(s)? This cannot be undone.`,
+        confirmLabel: 'Delete all',
+      });
+      if (!ok) return;
+    }
     for (const id of ids) {
       await this.ipc.api.workflows.delete(id);
     }
@@ -282,18 +330,58 @@ export class WorkflowsPageComponent implements OnInit {
   }
 
   async runNow(id: string): Promise<void> {
-    await this.ipc.api.engine.runWorkflow(id);
-    await this.reload();
-    this.toast.success('Workflow executed');
+    this.runningId.set(id);
+    try {
+      await this.ipc.api.engine.runWorkflow(id);
+      await this.reload();
+      this.toast.success('Workflow executed');
+    } finally {
+      this.runningId.set(null);
+    }
+  }
+
+  protected async toggleLastRun(workflowId: string): Promise<void> {
+    if (this.lastRunPanelId() === workflowId) {
+      this.lastRunPanelId.set(null);
+      this.lastRunDetail.set(null);
+      return;
+    }
+    this.lastRunPanelId.set(workflowId);
+    this.lastRunDetail.set(null);
+    const logs = (await this.ipc.api.logs.list({ limit: 50, workflowId })) as Array<Record<string, unknown>>;
+    const first = logs[0];
+    if (!first) {
+      this.lastRunDetail.set(null);
+      return;
+    }
+    const logId = String(first['id']);
+    const detail = await this.ipc.api.logs.get(logId);
+    const log = detail.log as Record<string, unknown> | null;
+    const steps = (detail.steps ?? []) as LogStepRow[];
+    if (!log) {
+      this.lastRunDetail.set(null);
+      return;
+    }
+    this.lastRunDetail.set({
+      id: logId,
+      started_at: String(log['started_at'] ?? ''),
+      finished_at: (log['finished_at'] as string) ?? null,
+      status: String(log['status'] ?? ''),
+      message: (log['message'] as string) ?? null,
+      steps,
+    });
   }
 
   async remove(id: string): Promise<void> {
-    const ok = await this.confirmDialog.confirm({
-      title: 'Delete workflow',
-      message: 'Delete this workflow? This cannot be undone.',
-      confirmLabel: 'Delete',
-    });
-    if (!ok) return;
+    const skip = (await this.ipc.api.settings.get('confirm_delete_workflow')) === '0';
+    if (!skip) {
+      const ok = await this.confirmDialog.confirm({
+        title: 'Delete workflow',
+        message: 'Delete this workflow? This cannot be undone.',
+        confirmLabel: 'Delete',
+      });
+      if (!ok) return;
+    }
     await this.ipc.api.workflows.delete(id);
     await this.reload();
     this.toast.info('Workflow deleted');

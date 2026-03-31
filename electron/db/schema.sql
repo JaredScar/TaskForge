@@ -12,7 +12,9 @@ CREATE TABLE IF NOT EXISTS workflows (
   last_run_at TEXT,
   last_run_summary TEXT,
   created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
+  updated_at TEXT NOT NULL,
+  source_template_id TEXT,
+  concurrency TEXT NOT NULL DEFAULT 'allow'
 );
 
 CREATE TABLE IF NOT EXISTS workflow_nodes (

@@ -71,6 +71,13 @@ export function startApiServer(
     res.json({ log, steps });
   });
 
+  app.get('/v1/variables', (_req, res) => {
+    const rows = db
+      .prepare(`SELECT id, name, type, value, scope FROM variables WHERE is_secret = 0 ORDER BY name`)
+      .all();
+    res.json({ variables: rows });
+  });
+
   app.post('/v1/workflows/run', async (req, res) => {
     const workflowId = (req.body as { workflow_id?: string })?.workflow_id;
     if (!workflowId) {

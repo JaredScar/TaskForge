@@ -24,7 +24,7 @@ contextBridge.exposeInMainWorld('taskForge', {
       inv<Array<{ kind: string; count: number }>>('catalog:usageByKind', nodeType),
   },
   logs: {
-    list: (opts?: { limit?: number }) => inv('logs:list', opts),
+    list: (opts?: { limit?: number; workflowId?: string }) => inv('logs:list', opts),
     get: (id: string) => inv('logs:get', id),
     clear: () => inv('logs:clear'),
     export: () => inv<string | null>('logs:export'),
@@ -36,8 +36,9 @@ contextBridge.exposeInMainWorld('taskForge', {
     delete: (id: string) => inv('variables:delete', id),
   },
   analytics: {
-    getSummary: () => inv('analytics:summary'),
-    getRunsByWorkflow: () => inv('analytics:runsByWorkflow'),
+    getSummary: (opts?: { rangeDays?: number }) => inv('analytics:summary', opts),
+    getRunsByWorkflow: (opts?: { rangeDays?: number }) => inv('analytics:runsByWorkflow', opts),
+    getRunsTimeSeries: (opts?: { rangeDays?: number }) => inv('analytics:runsTimeSeries', opts),
     getSystemHealth: () => inv('analytics:systemHealth'),
   },
   engine: {

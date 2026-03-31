@@ -56,6 +56,17 @@ function runMigrations(db: InstanceType<typeof BetterSqlite3>): void {
     }
     db.prepare(`INSERT INTO schema_migrations (version, applied_at) VALUES (3, ?)`).run(now);
   }
+  if (maxVer() < 4) {
+    const cols = db.prepare(`PRAGMA table_info(workflows)`).all() as { name: string }[];
+    const names = new Set(cols.map((c) => c.name));
+    if (!names.has('source_template_id')) {
+      db.exec(`ALTER TABLE workflows ADD COLUMN source_template_id TEXT`);
+    }
+    if (!names.has('concurrency')) {
+      db.exec(`ALTER TABLE workflows ADD COLUMN concurrency TEXT NOT NULL DEFAULT 'allow'`);
+    }
+    db.prepare(`INSERT INTO schema_migrations (version, applied_at) VALUES (4, ?)`).run(now);
+  }
 }
 
 /** API key, local user row, and default settings — safe to run on every startup. */
@@ -79,6 +90,8 @@ function ensureAppDefaults(db: InstanceType<typeof BetterSqlite3>): void {
     ['log_retention_days', '30'],
     ['engine_auto_start', '1'],
     ['notify_desktop', '1'],
+    ['max_concurrent_workflows', '5'],
+    ['confirm_delete_workflow', '1'],
   ];
   const ins = db.prepare(`INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)`);
   for (const [k, v] of defaults) {

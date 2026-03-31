@@ -11,6 +11,8 @@ export interface WorkflowDto {
   last_run_summary: string | null;
   created_at: string;
   updated_at: string;
+  source_template_id?: string | null;
+  concurrency?: string | null;
 }
 
 export interface WorkflowNodeDto {
@@ -45,7 +47,7 @@ export interface TaskForgeBridge {
     usageByKind: (nodeType: 'trigger' | 'action') => Promise<Array<{ kind: string; count: number }>>;
   };
   logs: {
-    list: (opts?: { limit?: number }) => Promise<unknown[]>;
+    list: (opts?: { limit?: number; workflowId?: string }) => Promise<unknown[]>;
     get: (id: string) => Promise<{ log: unknown; steps: unknown[] }>;
     clear: () => Promise<boolean>;
     export: () => Promise<string | null>;
@@ -57,7 +59,7 @@ export interface TaskForgeBridge {
     delete: (id: string) => Promise<boolean>;
   };
   analytics: {
-    getSummary: () => Promise<{
+    getSummary: (opts?: { rangeDays?: number }) => Promise<{
       totalRuns: number;
       successRate: number;
       avgDurationSec: number;
@@ -69,7 +71,8 @@ export interface TaskForgeBridge {
         activeWorkflows: { label: string; trend: 'up' | 'down' | 'flat'; favorable: boolean };
       };
     }>;
-    getRunsByWorkflow: () => Promise<Array<{ id: string; name: string; run_count: number }>>;
+    getRunsByWorkflow: (opts?: { rangeDays?: number }) => Promise<Array<{ id: string; name: string; run_count: number }>>;
+    getRunsTimeSeries: (opts?: { rangeDays?: number }) => Promise<Array<{ day: string; count: number }>>;
     getSystemHealth: () => Promise<{ cpu: number; memory: number; queue: number; storageGb: number }>;
   };
   engine: {
@@ -91,7 +94,9 @@ export interface TaskForgeBridge {
   audit: { list: () => Promise<unknown[]>; export: () => Promise<string | null> };
   api: { getKey: () => Promise<string>; regenerateKey: () => Promise<string> };
   marketplace: {
-    list: () => Promise<Array<{ id: string; title: string; author: string; description: string; pro: boolean }>>;
+    list: () => Promise<
+      Array<{ id: string; title: string; author: string; description: string; pro: boolean; installedCount: number }>
+    >;
     install: (id: string) => Promise<string | null>;
   };
   ai: { parse: (prompt: string) => Promise<{ name: string; nodes: Array<Record<string, unknown>> }> };

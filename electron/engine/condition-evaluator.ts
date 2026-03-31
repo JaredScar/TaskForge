@@ -4,11 +4,12 @@ import { interpolateConfigString } from './variable-interpolation';
 
 export async function evaluateCondition(
   node: WorkflowNodeRow,
-  vars: Record<string, string> = {}
+  vars: Record<string, string> = {},
+  context: Record<string, string> = {}
 ): Promise<{ ok: boolean; reason?: string }> {
   let config: Record<string, unknown>;
   try {
-    const raw = interpolateConfigString(node.config, vars);
+    const raw = interpolateConfigString(node.config, vars, context);
     config = JSON.parse(raw) as Record<string, unknown>;
   } catch {
     return { ok: false, reason: 'Invalid condition config' };

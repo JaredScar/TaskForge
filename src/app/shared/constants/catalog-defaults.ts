@@ -1,4 +1,4 @@
-/** Default node configs when creating a workflow from the Triggers / Actions catalog. */
+/** Renderer copy of defaults (keep in sync with `electron/catalog-starters.ts`). */
 
 export function defaultTriggerConfig(kind: string): Record<string, unknown> {
   switch (kind) {
@@ -27,6 +27,19 @@ export function defaultTriggerConfig(kind: string): Record<string, unknown> {
   }
 }
 
+export function defaultConditionConfig(kind: string): Record<string, unknown> {
+  switch (kind) {
+    case 'wifi_network':
+      return { ssid: '', label: 'WiFi network' };
+    case 'time_window':
+      return { start: '09:00', end: '17:00', label: 'Time window' };
+    case 'app_running':
+      return { process: '', label: 'App running' };
+    default:
+      return { label: kind };
+  }
+}
+
 export function defaultActionConfig(kind: string): Record<string, unknown> {
   switch (kind) {
     case 'open_application':
@@ -50,22 +63,4 @@ export function defaultActionConfig(kind: string): Record<string, unknown> {
     default:
       return { label: kind };
   }
-}
-
-export function defaultConditionConfig(kind: string): Record<string, unknown> {
-  switch (kind) {
-    case 'wifi_network':
-      return { ssid: '', label: 'WiFi network' };
-    case 'time_window':
-      return { start: '09:00', end: '17:00', label: 'Time window' };
-    case 'app_running':
-      return { process: '', label: 'App running' };
-    default:
-      return { label: kind };
-  }
-}
-
-/** Placeholder schedule so an action-only starter still has a runnable trigger chain. */
-export function stubTimeTriggerConfig(): Record<string, unknown> {
-  return { cron: '0 9 * * *', label: '9:00 AM daily (edit or replace)' };
 }
