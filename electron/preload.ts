@@ -1,5 +1,14 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
-import { isIpcErrorEnvelope } from './ipc-handle';
+
+/**
+ * Sandboxed preload may only `require('electron')` — not sibling `.js` files (see Electron sandbox tutorial).
+ * Keep flag + predicate in sync with `ipc-error-envelope.ts`.
+ */
+const IPC_ERROR_FLAG = '__tfIpcErr' as const;
+
+function isIpcErrorEnvelope(v: unknown): v is { code: string; message: string } {
+  return typeof v === 'object' && v !== null && IPC_ERROR_FLAG in v && (v as Record<string, unknown>)[IPC_ERROR_FLAG] === true;
+}
 
 function inv<T>(channel: string, ...args: unknown[]): Promise<T> {
   return (async () => {

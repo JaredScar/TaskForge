@@ -1,14 +1,8 @@
 import { ipcMain, type IpcMainInvokeEvent } from 'electron';
 import { EntitlementRequiredError } from './entitlement';
+import { IPC_ERROR_FLAG, type IpcErrorEnvelope } from './ipc-error-envelope';
 
-/** Preload/renderer detects this shape and throws `IpcCallError`. */
-export const IPC_ERROR_FLAG = '__tfIpcErr' as const;
-
-export type IpcErrorEnvelope = { [IPC_ERROR_FLAG]: true; code: string; message: string };
-
-export function isIpcErrorEnvelope(v: unknown): v is IpcErrorEnvelope {
-  return typeof v === 'object' && v !== null && IPC_ERROR_FLAG in v && (v as IpcErrorEnvelope)[IPC_ERROR_FLAG] === true;
-}
+export { IPC_ERROR_FLAG, type IpcErrorEnvelope, isIpcErrorEnvelope } from './ipc-error-envelope';
 
 /** Wraps invoke handlers so thrown errors become a structured envelope (never crashes the channel). */
 export function ipcHandle<TArgs extends unknown[], TRet>(
