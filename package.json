@@ -42,6 +42,14 @@
         "nsis"
       ]
     },
+    "mac": {
+      "target": ["dmg"],
+      "arch": ["x64", "arm64"],
+      "category": "public.app-category.productivity"
+    },
+    "dmg": {
+      "sign": false
+    },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
