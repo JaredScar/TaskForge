@@ -15,6 +15,24 @@ let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let apiStop: (() => void) | null = null;
 let isQuitting = false;
+/** Held for graceful WAL checkpoint + close on quit (avoids “lost” data after abrupt dev restarts). */
+let appDb: ReturnType<typeof openDatabase> | null = null;
+
+function shutdownDatabase(): void {
+  if (!appDb) return;
+  const d = appDb;
+  appDb = null;
+  try {
+    d.pragma('wal_checkpoint(TRUNCATE)');
+  } catch (e) {
+    console.error('[taskforge] wal_checkpoint failed', e);
+  }
+  try {
+    d.close();
+  } catch (e) {
+    console.error('[taskforge] database close failed', e);
+  }
+}
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -106,6 +124,9 @@ function createTray(): void {
 void app
   .whenReady()
   .then(() => {
+    if (process.platform === 'win32') {
+      app.setAppUserModelId('app.taskforge.desktop');
+    }
     if (process.platform !== 'darwin') {
       Menu.setApplicationMenu(null);
     }
@@ -113,6 +134,7 @@ void app
     let db: ReturnType<typeof openDatabase>;
     try {
       db = openDatabase();
+      appDb = db;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       dialog.showErrorBox(
@@ -177,4 +199,12 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
   isQuitting = true;
   apiStop?.();
+  shutdownDatabase();
+});
+
+process.once('SIGINT', () => {
+  void app.quit();
+});
+process.once('SIGTERM', () => {
+  void app.quit();
 });

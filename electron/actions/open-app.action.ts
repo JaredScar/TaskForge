@@ -12,7 +12,9 @@ export function runOpenApplication(config: Record<string, unknown>): Promise<voi
       windowsHide: false,
     });
     child.on('error', reject);
-    child.unref();
-    resolve();
+    child.once('spawn', () => {
+      child.unref();
+      resolve();
+    });
   });
 }

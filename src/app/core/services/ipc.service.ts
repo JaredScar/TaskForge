@@ -64,6 +64,49 @@ function mockUpdatePayloadNodesToDtos(workflowId: string, nodes: unknown[]): Wor
   });
 }
 
+/** Browser-only dev data survives tab close / `ng serve` restart (not used when `window.taskForge` exists). */
+const DEV_MOCK_STORE_KEY = 'taskforge_dev_store_v1';
+
+function hydrateDevMockFromStorage(
+  mockWorkflows: WorkflowDto[],
+  mockWorkflowNodes: Map<string, WorkflowNodeDto[]>
+): void {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    const raw = localStorage.getItem(DEV_MOCK_STORE_KEY);
+    if (!raw) return;
+    const j = JSON.parse(raw) as { workflows?: WorkflowDto[]; nodeEntries?: [string, WorkflowNodeDto[]][] };
+    if (Array.isArray(j.workflows)) {
+      mockWorkflows.splice(0, mockWorkflows.length, ...j.workflows);
+    }
+    mockWorkflowNodes.clear();
+    if (Array.isArray(j.nodeEntries)) {
+      for (const entry of j.nodeEntries) {
+        if (!Array.isArray(entry) || entry.length < 2) continue;
+        const [wid, nodes] = entry as [string, WorkflowNodeDto[]];
+        if (typeof wid === 'string' && Array.isArray(nodes)) {
+          mockWorkflowNodes.set(wid, nodes.map((n) => ({ ...n })));
+        }
+      }
+    }
+  } catch {
+    /* ignore corrupt */
+  }
+}
+
+function persistDevMockToStorage(mockWorkflows: WorkflowDto[], mockWorkflowNodes: Map<string, WorkflowNodeDto[]>): void {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    const nodeEntries: [string, WorkflowNodeDto[]][] = [...mockWorkflowNodes.entries()].map(([id, nodes]) => [
+      id,
+      nodes.map((n) => ({ ...n })),
+    ]);
+    localStorage.setItem(DEV_MOCK_STORE_KEY, JSON.stringify({ workflows: mockWorkflows, nodeEntries }));
+  } catch {
+    /* quota / private mode */
+  }
+}
+
 @Injectable({ providedIn: 'root' })
 export class IpcService {
   readonly isElectron = typeof window !== 'undefined' && !!window.taskForge;
@@ -81,6 +124,7 @@ export class IpcService {
     if (this.mockCached) return this.mockCached;
     const mockWorkflows: WorkflowDto[] = [];
     const mockWorkflowNodes = new Map<string, WorkflowNodeDto[]>();
+    hydrateDevMockFromStorage(mockWorkflows, mockWorkflowNodes);
     const mockSettings: Record<string, string> = {
       openai_api_key: LOCAL_DEV_OPENAI_API_KEY_PLACEHOLDER,
     };
@@ -110,6 +154,7 @@ export class IpcService {
             updated_at: new Date().toISOString(),
           });
           mockWorkflowNodes.set(id, []);
+          persistDevMockToStorage(mockWorkflows, mockWorkflowNodes);
           return id;
         },
         update: async (payload: Record<string, unknown>) => {
@@ -129,18 +174,21 @@ export class IpcService {
             mockWorkflowNodes.set(id, mockUpdatePayloadNodesToDtos(id, nodes));
           }
           w.updated_at = new Date().toISOString();
+          persistDevMockToStorage(mockWorkflows, mockWorkflowNodes);
           return true;
         },
         delete: async (delId: string) => {
           mockWorkflowNodes.delete(delId);
           const idx = mockWorkflows.findIndex((x) => x.id === delId);
           if (idx >= 0) mockWorkflows.splice(idx, 1);
+          persistDevMockToStorage(mockWorkflows, mockWorkflowNodes);
           return true;
         },
         toggle: async () => true,
         setEnabled: async (p) => {
           const w = mockWorkflows.find((x) => x.id === p.id);
           if (w) w.enabled = p.enabled ? 1 : 0;
+          persistDevMockToStorage(mockWorkflows, mockWorkflowNodes);
           return true;
         },
         createFromStarter: async (p) => {
@@ -160,6 +208,7 @@ export class IpcService {
             updated_at: new Date().toISOString(),
           });
           mockWorkflowNodes.set(id, []);
+          persistDevMockToStorage(mockWorkflows, mockWorkflowNodes);
           return id;
         },
         appendNode: async () => true,
@@ -182,6 +231,7 @@ export class IpcService {
             nid,
             src.map((n) => ({ ...n, id: crypto.randomUUID(), workflow_id: nid }))
           );
+          persistDevMockToStorage(mockWorkflows, mockWorkflowNodes);
           return nid;
         },
       },

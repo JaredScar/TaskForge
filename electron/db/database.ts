@@ -175,6 +175,9 @@ export function openDatabase(): InstanceType<typeof BetterSqlite3> {
   const dbPath = path.join(userData, 'taskforge.db');
   const db = new BetterSqlite3(dbPath);
   db.pragma('journal_mode = WAL');
+  db.pragma('foreign_keys = ON');
+  /* Reduce risk of losing recent writes if the process is killed (e.g. dev terminal Ctrl+C). */
+  db.pragma('synchronous = FULL');
   db.exec(loadSchemaSql());
   runMigrations(db);
   ensureAppDefaults(db);
