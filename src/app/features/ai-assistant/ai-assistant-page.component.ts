@@ -140,7 +140,9 @@ export class AiAssistantPageComponent {
         position_y: 0,
         sort_order: Number(n['sort_order'] ?? i),
       }));
-      await this.ipc.api.workflows.update({ id, nodes: mapped, edges: [], draft: true });
+      await this.ipc.api.workflows.update(
+        JSON.parse(JSON.stringify({ id, nodes: mapped, edges: [], draft: true })) as Record<string, unknown>
+      );
       this.draftWorkflowId.set(id);
       this.preview.set({
         name: draft.name,

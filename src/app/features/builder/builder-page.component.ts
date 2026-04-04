@@ -406,7 +406,7 @@ export class BuilderPageComponent implements OnInit, OnDestroy {
       return;
     }
     try {
-      await this.ipc.api.workflows.update({
+      const payload: Record<string, unknown> = {
         id: this.wfId,
         name: w.name,
         draft: false,
@@ -421,7 +421,13 @@ export class BuilderPageComponent implements OnInit, OnDestroy {
           sort_order: n.sort_order,
         })),
         edges: [],
-      });
+      };
+      /* Plain JSON so Electron IPC structured-clone never drops nested data from non-plain objects. */
+      const ok = await this.ipc.api.workflows.update(JSON.parse(JSON.stringify(payload)) as Record<string, unknown>);
+      if (!ok) {
+        this.toast.error('Save failed — workflow was not found.');
+        return;
+      }
       this.draft.set(false);
       this.invalidNodeIds.set(new Set());
       await this.load();

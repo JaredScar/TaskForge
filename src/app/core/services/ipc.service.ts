@@ -46,6 +46,24 @@ const MOCK_MARKETPLACE_LIST: Array<{ id: string; title: string; author: string; 
   { id: 'tmpl_welcome_startup', title: 'Welcome on startup', author: 'TaskForge', description: 'Welcome notification.', pro: false },
 ];
 
+function mockUpdatePayloadNodesToDtos(workflowId: string, nodes: unknown[]): WorkflowNodeDto[] {
+  return nodes.map((raw, i) => {
+    const n = raw as Record<string, unknown>;
+    const cfg = n['config'];
+    const configStr = typeof cfg === 'string' ? cfg : JSON.stringify(cfg ?? {});
+    return {
+      id: String(n['id'] ?? crypto.randomUUID()),
+      workflow_id: workflowId,
+      node_type: String(n['node_type'] ?? ''),
+      kind: String(n['kind'] ?? ''),
+      config: configStr,
+      position_x: Number(n['position_x'] ?? 0),
+      position_y: Number(n['position_y'] ?? 0),
+      sort_order: Number(n['sort_order'] ?? i),
+    };
+  });
+}
+
 @Injectable({ providedIn: 'root' })
 export class IpcService {
   readonly isElectron = typeof window !== 'undefined' && !!window.taskForge;
@@ -62,6 +80,7 @@ export class IpcService {
   private mockBridge(): TaskForgeBridge {
     if (this.mockCached) return this.mockCached;
     const mockWorkflows: WorkflowDto[] = [];
+    const mockWorkflowNodes = new Map<string, WorkflowNodeDto[]>();
     const mockSettings: Record<string, string> = {
       openai_api_key: LOCAL_DEV_OPENAI_API_KEY_PLACEHOLDER,
     };
@@ -71,7 +90,8 @@ export class IpcService {
         get: async (id: string) => {
           const w = mockWorkflows.find((x) => x.id === id);
           if (!w) return null;
-          return { workflow: w, nodes: [] as WorkflowNodeDto[], edges: [] };
+          const nodes = mockWorkflowNodes.get(id);
+          return { workflow: w, nodes: nodes ? [...nodes] : [], edges: [] };
         },
         create: async (p) => {
           const id = crypto.randomUUID();
@@ -89,10 +109,34 @@ export class IpcService {
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           });
+          mockWorkflowNodes.set(id, []);
           return id;
         },
-        update: async () => true,
-        delete: async () => true,
+        update: async (payload: Record<string, unknown>) => {
+          const id = String(payload['id'] ?? '');
+          const w = mockWorkflows.find((x) => x.id === id);
+          if (!w) return false;
+          if (typeof payload['name'] === 'string') w.name = payload['name'];
+          if (payload['description'] !== undefined) w.description = String(payload['description'] ?? '');
+          if (payload['draft'] === false) w.draft = 0;
+          else if (payload['draft'] === true) w.draft = 1;
+          const conc = payload['concurrency'];
+          if (conc === 'allow' || conc === 'queue' || conc === 'skip') {
+            (w as WorkflowDto & { concurrency?: string }).concurrency = conc;
+          }
+          const nodes = payload['nodes'];
+          if (Array.isArray(nodes)) {
+            mockWorkflowNodes.set(id, mockUpdatePayloadNodesToDtos(id, nodes));
+          }
+          w.updated_at = new Date().toISOString();
+          return true;
+        },
+        delete: async (delId: string) => {
+          mockWorkflowNodes.delete(delId);
+          const idx = mockWorkflows.findIndex((x) => x.id === delId);
+          if (idx >= 0) mockWorkflows.splice(idx, 1);
+          return true;
+        },
         toggle: async () => true,
         setEnabled: async (p) => {
           const w = mockWorkflows.find((x) => x.id === p.id);
@@ -115,6 +159,7 @@ export class IpcService {
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           });
+          mockWorkflowNodes.set(id, []);
           return id;
         },
         appendNode: async () => true,
@@ -132,6 +177,11 @@ export class IpcService {
             draft: 1,
             updated_at: new Date().toISOString(),
           });
+          const src = mockWorkflowNodes.get(id) ?? [];
+          mockWorkflowNodes.set(
+            nid,
+            src.map((n) => ({ ...n, id: crypto.randomUUID(), workflow_id: nid }))
+          );
           return nid;
         },
       },

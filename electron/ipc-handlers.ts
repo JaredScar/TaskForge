@@ -149,7 +149,14 @@ export function registerIpcHandlers(
       const cur = db.prepare(`SELECT * FROM workflows WHERE id = ?`).get(payload.id) as Record<string, unknown> | undefined;
       if (!cur) return false;
       if (
-        payload.nodes &&
+        payload.nodes !== undefined &&
+        payload.nodes !== null &&
+        !Array.isArray(payload.nodes)
+      ) {
+        throw new Error('workflows:update requires `nodes` to be an array when provided');
+      }
+      if (
+        Array.isArray(payload.nodes) &&
         workflowNodesRequireProEntitlement(payload.nodes as Array<Record<string, unknown>>) &&
         !isProEnterpriseUnlocked(db)
       ) {
@@ -169,7 +176,7 @@ export function registerIpcHandlers(
         now,
         payload.id
       );
-      if (payload.nodes) {
+      if (Array.isArray(payload.nodes)) {
         db.prepare(`DELETE FROM workflow_edges WHERE workflow_id = ?`).run(payload.id);
         db.prepare(`DELETE FROM workflow_nodes WHERE workflow_id = ?`).run(payload.id);
         const ins = db.prepare(
