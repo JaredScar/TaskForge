@@ -1,5 +1,6 @@
 import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
-import { Subscription } from 'rxjs';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { Subscription, from, switchMap } from 'rxjs';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { DragDropModule, CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
@@ -157,6 +158,15 @@ export class BuilderPageComponent implements OnInit, OnDestroy {
   private readonly hotkeys = inject(HotkeysService);
   private hotkeySubs: Subscription[] = [];
 
+  constructor() {
+    this.route.paramMap
+      .pipe(
+        switchMap((pm) => from(this.handleRouteParam(pm.get('id')))),
+        takeUntilDestroyed()
+      )
+      .subscribe();
+  }
+
   protected readonly workflow = signal<WorkflowDto | null>(null);
   protected readonly nodes = signal<WorkflowNodeDto[]>([]);
   protected readonly draft = signal(true);
@@ -200,13 +210,6 @@ export class BuilderPageComponent implements OnInit, OnDestroy {
       this.proUnlockedSig.set(false);
     }
 
-    let id = this.route.snapshot.paramMap.get('id') ?? '';
-    if (id === 'new') {
-      id = await this.ipc.api.workflows.create({ name: 'Untitled workflow', description: '' });
-      await this.router.navigate(['/builder', id], { replaceUrl: true });
-    }
-    this.wfId = id;
-    await this.load();
     this.hotkeySubs = [
       this.hotkeys.saveBuilder$.subscribe(() => void this.save()),
       this.hotkeys.testRunBuilder$.subscribe(() => void this.testRun()),
@@ -217,14 +220,50 @@ export class BuilderPageComponent implements OnInit, OnDestroy {
     for (const s of this.hotkeySubs) s.unsubscribe();
   }
 
+  /** Runs on every `:id` change; the router reuses this component, so snapshot-only init misses updates. */
+  private async handleRouteParam(rawId: string | null): Promise<void> {
+    let id = rawId ?? '';
+    if (id === 'new') {
+      try {
+        id = await this.ipc.api.workflows.create({ name: 'Untitled workflow', description: '' });
+        await this.router.navigate(['/builder', id], { replaceUrl: true });
+      } catch {
+        this.toast.error('Could not create workflow');
+        void this.router.navigate(['/workflows']);
+      }
+      return;
+    }
+    if (!id.trim()) {
+      void this.router.navigate(['/workflows']);
+      return;
+    }
+    this.wfId = id;
+    this.workflow.set(null);
+    this.nodes.set([]);
+    this.selectedId.set(null);
+    await this.load();
+  }
+
   private async load(): Promise<void> {
-    const data = await this.ipc.api.workflows.get(this.wfId);
-    if (!data) return;
-    this.workflow.set(data.workflow);
-    this.nodes.set([...data.nodes].sort((a, b) => a.sort_order - b.sort_order));
-    this.draft.set(!!data.workflow.draft);
-    const c = (data.workflow as WorkflowDto & { concurrency?: string }).concurrency;
-    this.concurrency.set(c === 'queue' || c === 'skip' ? c : 'allow');
+    const expectId = this.wfId;
+    try {
+      const data = await this.ipc.api.workflows.get(expectId);
+      if (expectId !== this.wfId) return;
+      if (!data) {
+        this.toast.warning('Workflow not found.');
+        void this.router.navigate(['/workflows']);
+        return;
+      }
+      this.workflow.set(data.workflow);
+      this.nodes.set([...data.nodes].sort((a, b) => a.sort_order - b.sort_order));
+      this.draft.set(!!data.workflow.draft);
+      const c = (data.workflow as WorkflowDto & { concurrency?: string }).concurrency;
+      this.concurrency.set(c === 'queue' || c === 'skip' ? c : 'allow');
+    } catch {
+      if (expectId !== this.wfId) return;
+      this.toast.error('Could not load workflow.');
+      void this.router.navigate(['/workflows']);
+    }
   }
 
   protected label(n: WorkflowNodeDto): string {

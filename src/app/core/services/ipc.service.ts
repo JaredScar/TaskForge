@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import type { TaskForgeBridge, WorkflowDto } from '../../../types/taskforge-window';
+import type { TaskForgeBridge, WorkflowDto, WorkflowNodeDto } from '../../../types/taskforge-window';
 import {
   LOCAL_DEV_OPENAI_API_KEY_PLACEHOLDER,
   LOCAL_DEV_REST_API_KEY_PLACEHOLDER,
@@ -68,7 +68,11 @@ export class IpcService {
     this.mockCached = {
       workflows: {
         list: async () => [...mockWorkflows],
-        get: async () => null,
+        get: async (id: string) => {
+          const w = mockWorkflows.find((x) => x.id === id);
+          if (!w) return null;
+          return { workflow: w, nodes: [] as WorkflowNodeDto[], edges: [] };
+        },
         create: async (p) => {
           const id = crypto.randomUUID();
           mockWorkflows.push({
