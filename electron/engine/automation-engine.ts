@@ -33,6 +33,15 @@ export class AutomationEngine {
     private readonly notifyStepProgress?: (payload: StepProgressPayload) => void
   ) {}
 
+  /** In-memory runs waiting behind `concurrency: queue` (not yet written to `execution_logs`). */
+  getQueuedRunCount(): number {
+    let n = 0;
+    for (const q of this.pending.values()) {
+      n += q.length;
+    }
+    return n;
+  }
+
   private getConcurrency(workflowId: string): 'allow' | 'queue' | 'skip' {
     const row = this.db.prepare(`SELECT concurrency FROM workflows WHERE id = ?`).get(workflowId) as
       | { concurrency: string }

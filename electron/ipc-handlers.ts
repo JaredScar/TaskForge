@@ -385,7 +385,7 @@ export function registerIpcHandlers(
     return true;
   });
 
-  ipcHandle('logs:export', async () => {
+  ipcHandle('logs:export', async (_e, format: 'csv' | 'json' = 'csv') => {
     const win = getWin();
     const rows = db
       .prepare(
@@ -395,32 +395,53 @@ export function registerIpcHandlers(
          ORDER BY e.started_at DESC`
       )
       .all() as Record<string, unknown>[];
-    const dlgOpts = {
-      defaultPath: 'taskforge-logs.csv',
-      filters: [{ name: 'CSV', extensions: ['csv'] }],
-    };
+    const dlgOpts =
+      format === 'json'
+        ? {
+            defaultPath: 'taskforge-logs.json',
+            filters: [{ name: 'JSON', extensions: ['json'] }],
+          }
+        : {
+            defaultPath: 'taskforge-logs.csv',
+            filters: [{ name: 'CSV', extensions: ['csv'] }],
+          };
     const { filePath } = win ? await dialog.showSaveDialog(win, dlgOpts) : await dialog.showSaveDialog(dlgOpts);
     if (!filePath) return null;
-    const esc = (c: unknown) => `"${String(c ?? '').replace(/"/g, '""')}"`;
-    const header = 'id,workflow_id,workflow_name,started_at,finished_at,status,trigger_kind,message,error\n';
-    const body = rows
-      .map((r) =>
-        [
-          r['id'],
-          r['workflow_id'],
-          r['workflow_name'],
-          r['started_at'],
-          r['finished_at'],
-          r['status'],
-          r['trigger_kind'],
-          r['message'],
-          r['error'],
-        ]
-          .map(esc)
-          .join(',')
-      )
-      .join('\n');
-    fs.writeFileSync(filePath, header + body, 'utf-8');
+    if (format === 'json') {
+      const stepStmt = db.prepare(
+        `SELECT step_type, step_kind, status, duration_ms, message, error, output FROM log_steps WHERE log_id = ? ORDER BY id ASC`
+      );
+      const payload = {
+        exported_at: new Date().toISOString(),
+        format: 'taskforge-execution-logs-v1',
+        logs: rows.map((r) => ({
+          ...r,
+          steps: stepStmt.all(String(r['id'])),
+        })),
+      };
+      fs.writeFileSync(filePath, JSON.stringify(payload, null, 2), 'utf-8');
+    } else {
+      const esc = (c: unknown) => `"${String(c ?? '').replace(/"/g, '""')}"`;
+      const header = 'id,workflow_id,workflow_name,started_at,finished_at,status,trigger_kind,message,error\n';
+      const body = rows
+        .map((r) =>
+          [
+            r['id'],
+            r['workflow_id'],
+            r['workflow_name'],
+            r['started_at'],
+            r['finished_at'],
+            r['status'],
+            r['trigger_kind'],
+            r['message'],
+            r['error'],
+          ]
+            .map(esc)
+            .join(',')
+        )
+        .join('\n');
+      fs.writeFileSync(filePath, header + body, 'utf-8');
+    }
     writeAuditLog(db, 'logs.export', filePath);
     return filePath;
   });
@@ -650,12 +671,13 @@ export function registerIpcHandlers(
       const load = await si.currentLoad();
       const mem = await si.mem();
       const fsSize = await si.fsSize();
-      const pending = (db.prepare(`SELECT COUNT(*) as c FROM execution_logs WHERE status = 'running'`).get() as { c: number }).c;
+      const queuedDb = (db.prepare(`SELECT COUNT(*) as c FROM execution_logs WHERE status = 'pending'`).get() as { c: number }).c;
+      const queuedMem = engine.getQueuedRunCount();
       const total = mem.total || 1;
       return {
         cpu: Math.round(load.currentLoad ?? 0),
         memory: Math.round((mem.used / total) * 100),
-        queue: Math.min(100, pending * 10),
+        queue: queuedDb + queuedMem,
         storageGb: fsSize[0] ? Math.round((fsSize[0].used / 1024 / 1024 / 1024) * 10) / 10 : 0,
       };
     } catch {
@@ -944,7 +966,8 @@ export function registerIpcHandlers(
 
   ipcHandle('app:getStats', async () => {
     const active = (db.prepare(`SELECT COUNT(*) as c FROM workflows WHERE enabled = 1`).get() as { c: number }).c;
-    const pending = (db.prepare(`SELECT COUNT(*) as c FROM execution_logs WHERE status = 'running'`).get() as { c: number }).c;
+    const queuedDb = (db.prepare(`SELECT COUNT(*) as c FROM execution_logs WHERE status = 'pending'`).get() as { c: number }).c;
+    const queue = queuedDb + engine.getQueuedRunCount();
     const triggerCount = (db.prepare(`SELECT COUNT(*) as c FROM workflow_nodes WHERE node_type = 'trigger'`).get() as { c: number }).c;
     const actionCount = (db.prepare(`SELECT COUNT(*) as c FROM workflow_nodes WHERE node_type = 'action'`).get() as { c: number }).c;
     let cpu = 0;
@@ -961,7 +984,7 @@ export function registerIpcHandlers(
     }
     return {
       active,
-      queue: pending,
+      queue,
       triggerCount,
       actionCount,
       engineRunning: triggers.isEngineReady(),

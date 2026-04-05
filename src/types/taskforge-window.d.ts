@@ -50,7 +50,7 @@ export interface TaskForgeBridge {
     list: (opts?: { limit?: number; workflowId?: string }) => Promise<unknown[]>;
     get: (id: string) => Promise<{ log: unknown; steps: unknown[] }>;
     clear: () => Promise<boolean>;
-    export: () => Promise<string | null>;
+    export: (format?: 'csv' | 'json') => Promise<string | null>;
     onStepProgress: (cb: (step: Record<string, unknown>) => void) => () => void;
   };
   variables: {

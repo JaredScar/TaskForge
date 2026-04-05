@@ -55,10 +55,17 @@ interface LogRow {
           </select>
           <button
             type="button"
-            (click)="exportLogs()"
+            (click)="exportLogs('csv')"
             class="h-9 rounded-lg border border-tf-border px-3 text-sm hover:bg-neutral-800"
           >
             Export CSV
+          </button>
+          <button
+            type="button"
+            (click)="exportLogs('json')"
+            class="h-9 rounded-lg border border-tf-border px-3 text-sm hover:bg-neutral-800"
+          >
+            Export JSON
           </button>
           <button type="button" (click)="clear()" class="h-9 rounded-lg border border-tf-border px-3 text-sm hover:bg-neutral-800">
             Clear all
@@ -250,9 +257,9 @@ export class LogsPageComponent implements OnInit, OnDestroy {
     this.expanded.set(set);
   }
 
-  async exportLogs(): Promise<void> {
+  async exportLogs(format: 'csv' | 'json'): Promise<void> {
     try {
-      const path = await this.ipc.api.logs.export();
+      const path = await this.ipc.api.logs.export(format);
       if (path) this.toast.success(`Exported to ${path}`);
       else this.toast.info('Export cancelled');
     } catch {

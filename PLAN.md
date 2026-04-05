@@ -1,6 +1,6 @@
 # TaskForge – Full Implementation Plan
 
-> Last updated: 2026-03-31 · *Partial implementation progress is reflected in §22 Phase 2–3 status columns where noted.*
+> Last updated: 2026-04-04 · *Implementation status is reflected in §22 and inline ✅ notes where noted.*
 >
 > This plan maps every piece of dummy/hardcoded data and every incomplete feature in the app to concrete implementation tasks. Tasks are grouped by feature area and ordered by dependency. Each item lists the files involved and the acceptance criteria.
 >
@@ -82,17 +82,17 @@
 
 ---
 
-### 1.4 — Queue Count Fallback (DUMMY)
+### 1.4 — Queue Count Fallback (DUMMY) ✅ IMPLEMENTED
 
-**Current state:** In `ipc-handlers.ts`, `app:getStats` returns `pending || 3` when there are no running logs — hardcoding a queue of 3.
+**Current state:** ~~In `ipc-handlers.ts`, `app:getStats` returns `pending || 3` when there are no running logs — hardcoding a queue of 3.~~ Removed.
 
-**What to build:**
-- Remove the `|| 3` fallback. Return `0` when the queue is genuinely empty.
-- Add a `queued` column count from `execution_logs WHERE status = 'pending'`.
+**Implemented:**
+- `app:getStats` **queue** = `COUNT(*)` from `execution_logs WHERE status = 'pending'` **plus** in-memory queued runs in `AutomationEngine` (`concurrency: queue` while another run is in flight — these are not yet rows in the DB).
+- `analytics:systemHealth` **queue** uses the same sum (replaces the old placeholder scaling).
 
-**Files:** `electron/ipc-handlers.ts`
+**Files:** `electron/ipc-handlers.ts`, `electron/engine/automation-engine.ts`
 
-**Acceptance:** Queue counter shows `0` on a fresh install; increments when workflows are queued.
+**Acceptance:** Queue counter shows `0` on a fresh install; increments when workflows are queued (memory queue and/or `pending` log rows).
 
 ---
 
@@ -318,25 +318,21 @@
 
 ---
 
-### 6.4 — Log Export
+### 6.4 — Log Export ✅ IMPLEMENTED
 
-**What to build:**
-- Export filtered logs to CSV or JSON via Electron save dialog.
-- Reuse the pattern already used in `audit-logs-page.component.ts`.
+**Implemented:**
+- CSV and JSON export via save dialog (`logs:export` with `format: 'csv' | 'json'`). JSON includes nested `log_steps` per log.
+- Execution logs page: **Export CSV** and **Export JSON** buttons.
+
+**Files:** `electron/ipc-handlers.ts`, `electron/preload.ts`, `src/app/features/logs/logs-page.component.ts`
 
 ---
 
 ## 7. Variables Page
 
-### 7.1 — Inline Edit (MISSING)
+### 7.1 — Inline Edit ✅ IMPLEMENTED
 
-**Current state:** Variables can be created and deleted but not edited in place.
-
-**What to build:**
-- Click a variable row to open an inline edit form (same fields as the create modal: name, type, value, is_secret, scope).
-- "Save" calls `variables:update` IPC; "Cancel" reverts.
-
-**Files:** `src/app/features/variables/variables-page.component.ts`
+**Implemented:** Edit / Save / Cancel on each variable row via `variables:update` (`variables-page.component.ts`).
 
 ---
 
@@ -451,40 +447,27 @@ npm install chart.js ng2-charts
 
 ## 10. AI Assistant Page
 
-### 10.1 — Raw JSON Response (INCOMPLETE)
+### 10.1 — Raw JSON Response ✅ IMPLEMENTED
 
-**Current state:** The AI assistant creates a workflow but the response is displayed as raw JSON in the chat.
-
-**What to build:**
-- Parse the returned workflow draft and render a visual preview card showing: workflow name, trigger chip, condition chip(s), action chip(s) — with icons.
-- Show a "Review in Builder" button and a "Create & Run" button.
-- Keep the raw JSON in a collapsible "Developer view" section.
-
-**Files:** `src/app/features/ai-assistant/ai-assistant-page.component.ts`
+**Implemented:** Draft preview card (name + node type/kind chips), **Review in Builder** link after create, collapsible developer JSON (`ai-assistant-page.component.ts`). *Optional:* icon per kind, separate **Create & Run** action.
 
 ---
 
-### 10.2 — Streaming Responses
+### 10.2 — Streaming Responses ✅ IMPLEMENTED
 
-**Current state:** The AI call blocks until the full response arrives.
+**Implemented:**
+- Main process: `streamWorkflowCompletion` in `electron/ai-workflow.ts` with `stream: true`; handler `ai:parseStream` sends chunks via `webContents.send('ai:streamToken', chunk)` (preload subscribes with `ai.onStreamToken`).
+- Renderer: `ai-assistant-page` appends streaming text to **Model output (streaming)** during `parseStream`, then clears after the draft is built.
 
-**What to build:**
-- Switch the OpenAI call in the main process to use streaming (`stream: true`).
-- Emit partial tokens via `webContents.send('ai:token', token)`.
-- In the renderer, append tokens to the chat bubble in real time.
-
-**Files:** `electron/ipc-handlers.ts` (or a new `electron/ai-service.ts`), `src/app/features/ai-assistant/ai-assistant-page.component.ts`
+**Files:** `electron/ipc-handlers.ts`, `electron/ai-workflow.ts`, `electron/preload.ts`, `src/app/features/ai-assistant/ai-assistant-page.component.ts`
 
 ---
 
-### 10.3 — Conversation History
+### 10.3 — Conversation History (partial)
 
-**Current state:** Each prompt is stateless — there is no multi-turn context.
+**Implemented:** Session `conversation` signal; prior turns passed as `messages` into `ai:parse` / `ai:parseStream` (`ai-assistant-page.component.ts`).
 
-**What to build:**
-- Maintain a `messages[]` array in the component for the current session.
-- Pass the full history to OpenAI on each call (subject to a token budget trim).
-- Allow users to say "change the trigger to 8 AM" and have the AI update the previously generated workflow draft.
+**Remaining:** Token-budget trimming, richer multi-turn UX (e.g. “change the trigger to 8 AM” updating the last draft without always creating a new workflow).
 
 ---
 
@@ -801,32 +784,22 @@ npm install chart.js ng2-charts
 
 ## 19. IPC / Bridge Layer
 
-### 19.1 — Type Safety
+### 19.1 — Type Safety ✅ IMPLEMENTED (renderer contract)
 
-**Current state:** IPC channel names are raw strings scattered across `ipc-handlers.ts` and `ipc.service.ts`. There is no shared type for the request/response of each channel.
+**Implemented:**
+- `src/types/ipc-channels.ts` defines `IpcInvokeMap` (channel → `req` / `res`) and `AppStats`, aligned with `ipc-handlers.ts` / `preload.ts`. Example use: `AppStats` types the shell stats signal.
+- Preload remains JavaScript-friendly; channel strings must stay in sync manually (comment in `ipc-channels.ts` points to main + preload).
 
-**What to build:**
-- Create `src/types/ipc-channels.ts` (also imported from electron via a path alias) defining:
-  ```typescript
-  export type IpcChannels = {
-    'workflows:list': { req: void; res: WorkflowDto[] };
-    'workflows:create': { req: CreateWorkflowDto; res: WorkflowDto };
-    // ... etc
-  };
-  ```
-- Update `preload.ts` to be typed against `IpcChannels`.
-- Update `ipc.service.ts` to use these types for all `invoke()` calls.
+**Optional later:** Path-alias the same file into the Electron `tsconfig` so `preload.ts` can import channel literals without duplication.
 
 ---
 
-### 19.2 — Error Handling
+### 19.2 — Error Handling ✅ IMPLEMENTED
 
-**Current state:** IPC handlers lack consistent error handling. An unhandled exception in a handler crashes the handler and returns an opaque error to the renderer.
-
-**What to build:**
-- Wrap every `ipcMain.handle()` callback in a `try/catch`.
-- Return a typed error envelope `{ success: false, error: string, code: string }` on failure.
-- In `ipc.service.ts`, check the envelope and throw a typed `IpcError` that the UI can catch and display.
+**Implemented:**
+- Every invoke handler is registered via `ipcHandle()` in `electron/ipc-handle.ts`, which wraps `try/catch` and returns `IpcErrorEnvelope` (`__tfIpcErr`, `code`, `message`) on failure (including `EntitlementRequiredError`).
+- Preload `inv()` detects the envelope and throws `Error` with `name: 'TaskForgeIpcError'` and `code` set for the renderer.
+- `src/app/core/utils/ipc-error.ts` provides `TaskForgeIpcError` / `isTaskForgeIpcFailure()` for UI checks where needed.
 
 ---
 
@@ -1155,15 +1128,14 @@ The license API is **not** part of the open-source app; implement with your stac
 
 ---
 
-### 21.5 — Keyboard Shortcuts
+### 21.5 — Keyboard Shortcuts ✅ IMPLEMENTED
 
-**What to build:**
-- `Ctrl+N` → New workflow (from anywhere in the app)
-- `Ctrl+F` → Focus search bar on current page
-- `Ctrl+S` → Save in the builder
-- `Ctrl+R` → Test-run current workflow (in builder)
-- `Escape` → Close any open modal
-- Render a keyboard shortcut legend accessible via `?` key.
+**Implemented (see `app-shell.component.ts` / `.html`):**
+- `Ctrl/Cmd+N` → New workflow (skipped when focus is in an input; viewers blocked with toast).
+- `Ctrl/Cmd+F` → Focus `[data-tf-focus-search]`.
+- In Builder: `Ctrl/Cmd+S` → save (`HotkeysService.saveBuilder$`); `Ctrl/Cmd+R` → test run (`HotkeysService.testRunBuilder$`).
+- `Escape` → Close hotkey legend, confirm dialog response (cancel), or other shell-handled overlays.
+- `?` (outside inputs) → Toggle keyboard shortcuts legend panel.
 
 ---
 
@@ -1172,24 +1144,24 @@ The license API is **not** part of the open-source app; implement with your stac
 ### Phase 1 — Cleanup & Real Data (2–3 weeks)
 Remove all dummy data, connect existing UI to real IPC, fix broken interactions.
 
-| # | Task | Section |
-|---|---|---|
-| 1 | Remove `|| 3` queue fallback | §1.4 |
-| 2 | Remove demo seed data; add real default seeds | §18.1 |
-| 3 | Add onboarding screen | §18.2 |
-| 4 | Fix sidebar counters | §1.2 |
-| 5 | Fix engine status badge | §1.1 |
-| 6 | Fix team header label | §1.3 |
-| 7 | Wire Invite Member button | §11.1 |
-| 8 | Wire inline variable edit | §7.1 |
-| 9 | Add global ToastService | §21.1 |
-| 10 | Add ConfirmDialog (replace `confirm()`) | §21.2 |
-| 11 | Add UI audit logging for all mutations | §13.1 |
-| 12 | Add post-run status refresh on workflow cards | §2.1 |
-| 13 | Add logs auto-refresh via IPC push event | §6.1 |
-| 14 | Add migration system | §18.3 |
-| 15 | Fix hardcoded analytics trend labels | §8.1 |
-| 16 | Add settings: log retention, notifications, engine config | §14.1 |
+| # | Task | Section | Status |
+|---|---|---|---|
+| 1 | Queue / stats (no dummy queue; real pending + engine queue) | §1.4 | ✅ Done |
+| 2 | Remove demo seed data; real default seeds | §18.1 | ✅ Done |
+| 3 | Onboarding screen | §18.2 | ✅ Done |
+| 4 | Sidebar counters (triggers/actions counts) | §1.2 | ✅ Done |
+| 5 | Engine status badge | §1.1 | ✅ Done |
+| 6 | Team header label (`is_self` + `/team`) | §1.3 | ✅ Done |
+| 7 | Invite Member (local modal + IPC) | §11.1 | ✅ Done |
+| 8 | Inline variable edit | §7.1 | ✅ Done |
+| 9 | Global ToastService | §21.1 | ✅ Done |
+| 10 | ConfirmDialog | §21.2 | ✅ Done |
+| 11 | UI audit logging for mutations | §13.1 | ✅ Done (where wired) |
+| 12 | Post-run status refresh on workflow cards | §2.1 | ✅ Done |
+| 13 | Logs auto-refresh (`logs:new` + subscribe) | §6.1 | ✅ Done |
+| 14 | Migration system (`schema_migrations` + `runMigrations`) | §18.3 | ✅ Done |
+| 15 | Analytics trend labels (real deltas) | §8.1 | ✅ Done |
+| 16 | Settings: log retention, notifications, engine | §14.1 | Partial — core settings keys exist; see §14.1 for any remaining toggles |
 
 ### Phase 2 — Feature Completion (3–4 weeks)
 Complete all partially-built features and add the missing interactions.
@@ -1211,15 +1183,15 @@ Complete all partially-built features and add the missing interactions.
 | 13 | Replace analytics DIV chart with Chart.js | §8.2 | ✅ Done |
 | 14 | Analytics date range picker | §8.3 | ✅ Done |
 | 15 | Log filter persistence in URL | §6.3 | ✅ Done |
-| 16 | Log export (CSV/JSON) | §6.4 | ✅ Done (CSV) |
+| 16 | Log export (CSV/JSON) | §6.4 | ✅ Done (CSV + JSON) |
 | 17 | Triggers/Actions pages: usage counts + "use" buttons | §4.1, §5.1 | ✅ Done |
 | 18 | Duplicate workflow | §2.3 | ✅ Done |
 | 19 | Bulk workflow actions | §2.4 | ✅ Done |
 | 20 | AI response card UI | §10.1 | ✅ Done |
-| 21 | AI streaming | §10.2 | Pending |
+| 21 | AI streaming | §10.2 | ✅ Done |
 | 22 | Expand API endpoints | §12.3 | ✅ Done (+ `GET /v1/variables`) |
-| 23 | IPC type safety | §19.1 | Pending |
-| 24 | IPC error handling | §19.2 | Pending |
+| 23 | IPC type safety | §19.1 | ✅ Done (`src/types/ipc-channels.ts`) |
+| 24 | IPC error handling | §19.2 | ✅ Done (`ipcHandle` + envelope + preload + `ipc-error.ts`) |
 
 ### Phase 3 — V2 Visual Builder & Advanced Features (4–6 weeks)
 The flagship visual canvas builder and advanced integrations.
@@ -1235,7 +1207,7 @@ The flagship visual canvas builder and advanced integrations.
 | 7 | Marketplace "installed" state | §9.3 · ✅ Done (`source_template_id` + badge) |
 | 8 | Trigger state persistence + missed trigger replay | §16.2 |
 | 9 | Role-based UI (team permissions) | §11.3 |
-| 10 | Keyboard shortcuts | §21.5 |
+| 10 | Keyboard shortcuts | §21.5 · ✅ Done |
 | 11 | Data export / import (ZIP) | §14.1 |
 | 12 | Online license validation (client: cache, grace, IPC) | §20.9 · Partial (`license-remote.ts`, `hybrid` / `online_strict`, startup refresh) |
 | 13 | License key expiry (`exp` field in payload) | §20.8 · ✅ client decode |
@@ -1328,3 +1300,5 @@ Customers receive an **organization license key** from checkout or your billing 
 ---
 
 *End of plan. Each section above is a self-contained unit of work; they can be assigned individually to implement in any order within a phase, as long as phase 1 prerequisites (real data foundation, IPC error handling) are completed first.*
+
+**Note (2026-04-04):** Large Phase 3 / Phase 4 items (visual canvas §3.3, live run panel §6.2, multi-turn AI §10.3, remote marketplace §9.2, RBAC §11.3, ZIP import §14.1, full online license server §20.9.6, etc.) remain **future** work — the checklist above marks only what is implemented in the repo today.

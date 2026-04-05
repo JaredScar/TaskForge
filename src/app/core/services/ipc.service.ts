@@ -295,7 +295,7 @@ export class IpcService {
         list: async () => [],
         get: async () => ({ log: null, steps: [] }),
         clear: async () => true,
-        export: async () => null,
+        export: async (_format?: 'csv' | 'json') => null,
         onStepProgress: () => () => undefined,
       },
       variables: { list: async () => [], create: async () => true, update: async () => true, delete: async () => true },

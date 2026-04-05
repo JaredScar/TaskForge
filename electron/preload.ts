@@ -15,6 +15,7 @@ function inv<T>(channel: string, ...args: unknown[]): Promise<T> {
     const v = await ipcRenderer.invoke(channel, ...args);
     if (isIpcErrorEnvelope(v)) {
       const err = new Error(v.message);
+      err.name = 'TaskForgeIpcError';
       (err as Error & { code?: string }).code = v.code;
       throw err;
     }
@@ -45,7 +46,7 @@ contextBridge.exposeInMainWorld('taskForge', {
     list: (opts?: { limit?: number; workflowId?: string }) => inv('logs:list', opts),
     get: (id: string) => inv('logs:get', id),
     clear: () => inv('logs:clear'),
-    export: () => inv<string | null>('logs:export'),
+    export: (format?: 'csv' | 'json') => inv<string | null>('logs:export', format ?? 'csv'),
     onStepProgress: (cb: (step: Record<string, unknown>) => void) => {
       const handler = (_e: IpcRendererEvent, step: Record<string, unknown>) => cb(step);
       ipcRenderer.on('logs:stepProgress', handler);

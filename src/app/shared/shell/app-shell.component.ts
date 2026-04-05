@@ -7,6 +7,7 @@ import { ConfirmDialogService } from '../../core/services/confirm-dialog.service
 import { HotkeysService } from '../../core/services/hotkeys.service';
 import type { ToastLevel } from '../../core/services/toast.service';
 import { LEGACY_ONBOARDING_DONE_STORAGE_KEY } from '../../core/legacy-onboarding-key';
+import type { AppStats } from '../../../types/ipc-channels';
 
 @Component({
   selector: 'app-shell',
@@ -26,7 +27,7 @@ export class AppShellComponent implements OnInit, OnDestroy {
   protected readonly selfMember = signal<{ display_name: string; role: string } | null>(null);
   protected readonly isViewerRole = signal(false);
   protected readonly showHotkeysLegend = signal(false);
-  protected readonly stats = signal({
+  protected readonly stats = signal<AppStats>({
     active: 0,
     queue: 0,
     triggerCount: 0,
