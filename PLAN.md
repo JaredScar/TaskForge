@@ -303,14 +303,16 @@
 
 ---
 
-### 6.3 — Log Filtering & Search (INCOMPLETE)
+### 6.3 — Log Filtering & Search ✅ IMPLEMENTED
 
-**Current state:** Filter UI exists but is limited.
+**Implemented:**
+- **Status** and text search (workflow name, `message`, `error`, and **trigger_kind** substring).
+- **Date range** (`From` / `To`) on the log’s **local calendar day** for `started_at`; if `from` is after `to`, the range is still applied inclusively (comparison swaps the two bounds only for filtering).
+- **Trigger kind** dropdown (all distinct `trigger_kind` values in the current loaded page, up to **500** recent logs).
+- URL query params: `q`, `status`, **`from`**, **`to`**, **`trigger`** (bookmarkable).
+- Table column **Trigger** (humanized labels).
 
-**What to build:**
-- Filter by: workflow name, status (success/failure/running), date range (from/to date pickers), trigger kind.
-- Full-text search across `message` and `error` fields.
-- Persist filter state in URL query params so the page is bookmarkable.
+**Files:** `src/app/features/logs/logs-page.component.ts`
 
 ---
 
@@ -421,12 +423,11 @@ npm install chart.js ng2-charts
 
 ---
 
-### 9.2 — Remote Template Registry (V2)
+### 9.2 — Remote Template Registry (V2) ✅ IMPLEMENTED
 
-**What to build:**
-- Host a public JSON file (GitHub Gist or static URL) containing the template registry.
-- In `ipc-handlers.ts`, `marketplace:list` fetches from the remote URL with a 5-second timeout and falls back to `marketplace-data.ts` if the fetch fails.
-- Cache the remote response in SQLite for offline use (new `marketplace_cache` table or a settings key).
+**Implemented:** `electron/marketplace-remote.ts` — optional env **`TASKFORGE_MARKETPLACE_URL`** (JSON `{ "templates": [...] }` or a bare array), **5 s** `AbortController` timeout, merge with `MARKETPLACE_ITEMS` (remote wins on same `id`), **SQLite `settings` key** `marketplace_cache_json` for offline fallback, then built-ins only if cache empty.
+
+**Optional later:** Dedicated `marketplace_cache` table + `fetched_at` for auditing.
 
 ---
 
@@ -1178,7 +1179,7 @@ Complete all partially-built features and add the missing interactions.
 | 12 | Expand marketplace to 12+ templates | §9.1 | ✅ Done |
 | 13 | Replace analytics DIV chart with Chart.js | §8.2 | ✅ Done |
 | 14 | Analytics date range picker | §8.3 | ✅ Done |
-| 15 | Log filter persistence in URL | §6.3 | ✅ Done |
+| 15 | Log filter persistence in URL | §6.3 | ✅ Done (`q`, `status`, `from`, `to`, `trigger`) |
 | 16 | Log export (CSV/JSON) | §6.4 | ✅ Done (CSV + JSON) |
 | 17 | Triggers/Actions pages: usage counts + "use" buttons | §4.1, §5.1 | ✅ Done |
 | 18 | Duplicate workflow | §2.3 | ✅ Done |
@@ -1199,7 +1200,7 @@ The flagship visual canvas builder and advanced integrations.
 | 3 | Workflow run history inline panel | §2.2 · ✅ Done (last run panel on workflow cards) |
 | 4 | AI conversation history | §10.3 |
 | 5 | Multiple API keys with scopes | §12.1, §12.2 |
-| 6 | Remote marketplace registry | §9.2 |
+| 6 | Remote marketplace registry | §9.2 · ✅ Done (`TASKFORGE_MARKETPLACE_URL` + cache) |
 | 7 | Marketplace "installed" state | §9.3 · ✅ Done (`source_template_id` + badge) |
 | 8 | Trigger state persistence + missed trigger replay | §16.2 |
 | 9 | Role-based UI (team permissions) | §11.3 |
@@ -1297,4 +1298,4 @@ Customers receive an **organization license key** from checkout or your billing 
 
 *End of plan. Each section above is a self-contained unit of work; they can be assigned individually to implement in any order within a phase, as long as phase 1 prerequisites (real data foundation, IPC error handling) are completed first.*
 
-**Note (2026-04-04):** Large Phase 3 / Phase 4 items (visual canvas §3.3, live run panel §6.2, multi-turn AI §10.3, remote marketplace §9.2, RBAC §11.3, ZIP import §14.1, full online license server §20.9.6, etc.) remain **future** work — the checklist above marks only what is implemented in the repo today.
+**Note (2026-04-04):** Large Phase 3 / Phase 4 items (visual canvas §3.3, multi-turn AI §10.3 polish, RBAC §11.3, ZIP import §14.1, full online license server §20.9.6, etc.) remain **future** work where not marked ✅ — the checklist reflects the repo.

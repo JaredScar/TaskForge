@@ -22,8 +22,19 @@ interface LogRow {
   status: string;
   message: string | null;
   error: string | null;
+  trigger_kind: string | null;
   workflow_name: string;
   steps?: LogStepRow[];
+}
+
+/** Local calendar day `YYYY-MM-DD` for `started_at` (user's timezone). */
+function localDayKey(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 /** PLAN §6.2 — live step stream from `logs:stepProgress`. */
@@ -64,7 +75,7 @@ function upsertLiveStep(steps: LiveStepLine[], line: LiveStepLine): LiveStepLine
             data-tf-focus-search
             [ngModel]="filter()"
             (ngModelChange)="onFilterChange($event)"
-            placeholder="Filter…"
+            placeholder="Search workflow, message, error, trigger…"
             class="h-9 rounded-lg border border-tf-border bg-tf-card px-3 text-sm outline-none focus:ring-1 focus:ring-tf-green"
           />
           <select
@@ -77,6 +88,34 @@ function upsertLiveStep(steps: LiveStepLine[], line: LiveStepLine): LiveStepLine
             <option value="failure">Failure</option>
             <option value="running">Running</option>
             <option value="skipped">Skipped</option>
+          </select>
+          <label class="flex h-9 items-center gap-1.5 rounded-lg border border-tf-border bg-tf-card px-2 text-xs text-tf-muted">
+            <span class="shrink-0">From</span>
+            <input
+              type="date"
+              [ngModel]="dateFrom()"
+              (ngModelChange)="onDateFromChange($event)"
+              class="min-w-0 bg-transparent text-sm text-neutral-200 outline-none"
+            />
+          </label>
+          <label class="flex h-9 items-center gap-1.5 rounded-lg border border-tf-border bg-tf-card px-2 text-xs text-tf-muted">
+            <span class="shrink-0">To</span>
+            <input
+              type="date"
+              [ngModel]="dateTo()"
+              (ngModelChange)="onDateToChange($event)"
+              class="min-w-0 bg-transparent text-sm text-neutral-200 outline-none"
+            />
+          </label>
+          <select
+            [ngModel]="triggerFilter()"
+            (ngModelChange)="onTriggerFilterChange($event)"
+            class="h-9 max-w-[10rem] rounded-lg border border-tf-border bg-tf-card px-2 text-sm outline-none focus:ring-1 focus:ring-tf-green"
+          >
+            <option value="all">All triggers</option>
+            @for (tk of triggerKindOptions(); track tk) {
+              <option [value]="tk">{{ formatTriggerLabel(tk) }}</option>
+            }
           </select>
           <button
             type="button"
@@ -216,6 +255,7 @@ function upsertLiveStep(steps: LiveStepLine[], line: LiveStepLine): LiveStepLine
             <tr>
               <th class="p-3">Time</th>
               <th class="p-3">Workflow</th>
+              <th class="p-3">Trigger</th>
               <th class="p-3">Status</th>
               <th class="p-3">Message</th>
               <th class="p-3 text-right">Duration</th>
@@ -229,6 +269,9 @@ function upsertLiveStep(steps: LiveStepLine[], line: LiveStepLine): LiveStepLine
                 <td class="p-3">
                   <span class="rounded-full bg-neutral-800 px-2 py-0.5 text-xs">{{ row.workflow_name }}</span>
                 </td>
+                <td class="max-w-[8rem] truncate p-3 font-mono text-[10px] text-tf-muted" [title]="row.trigger_kind ?? ''">
+                  {{ formatTriggerLabel(row.trigger_kind) }}
+                </td>
                 <td class="p-3">{{ statusIcon(row.status) }}</td>
                 <td class="p-3 text-xs text-neutral-300">{{ row.message || row.error || '—' }}</td>
                 <td class="p-3 text-right text-xs text-tf-muted">{{ duration(row) }}</td>
@@ -240,7 +283,7 @@ function upsertLiveStep(steps: LiveStepLine[], line: LiveStepLine): LiveStepLine
               </tr>
               @if (expanded().has(row.id)) {
                 <tr class="bg-tf-card/30">
-                  <td colspan="6" class="p-4 font-mono text-xs text-neutral-400">
+                  <td colspan="7" class="p-4 font-mono text-xs text-neutral-400">
                     @if (row.steps?.length) {
                       @for (s of row.steps; track $index) {
                         <div class="py-1">
@@ -277,12 +320,18 @@ export class LogsPageComponent implements OnInit, OnDestroy {
   protected readonly liveSessions = signal<LiveSession[]>([]);
   protected readonly filter = signal('');
   protected readonly statusFilter = signal('all');
+  protected readonly dateFrom = signal('');
+  protected readonly dateTo = signal('');
+  protected readonly triggerFilter = signal('all');
   protected readonly expanded = signal(new Set<string>());
 
   ngOnInit(): void {
     this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((pm) => {
       this.filter.set(pm.get('q') ?? '');
       this.statusFilter.set(pm.get('status') ?? 'all');
+      this.dateFrom.set(pm.get('from') ?? '');
+      this.dateTo.set(pm.get('to') ?? '');
+      this.triggerFilter.set(pm.get('trigger') ?? 'all');
     });
     void this.reload();
     this.disposeLogs = this.ipc.api.app.onLogsNew(() => void this.reload());
@@ -361,14 +410,50 @@ export class LogsPageComponent implements OnInit, OnDestroy {
     this.syncQueryParams();
   }
 
+  protected onDateFromChange(v: string): void {
+    this.dateFrom.set(v ?? '');
+    this.syncQueryParams();
+  }
+
+  protected onDateToChange(v: string): void {
+    this.dateTo.set(v ?? '');
+    this.syncQueryParams();
+  }
+
+  protected onTriggerFilterChange(v: string): void {
+    this.triggerFilter.set(v || 'all');
+    this.syncQueryParams();
+  }
+
+  /** Distinct non-empty trigger_kind values in the loaded page (for the dropdown). */
+  protected triggerKindOptions(): string[] {
+    const set = new Set<string>();
+    for (const r of this.rows()) {
+      const t = (r.trigger_kind ?? '').trim();
+      if (t) set.add(t);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }
+
+  protected formatTriggerLabel(kind: string | null | undefined): string {
+    if (kind == null || kind === '') return '—';
+    return kind.replace(/_/g, ' ');
+  }
+
   private syncQueryParams(): void {
     const q = this.filter().trim();
     const st = this.statusFilter();
+    const from = this.dateFrom().trim();
+    const to = this.dateTo().trim();
+    const tr = this.triggerFilter();
     void this.router.navigate([], {
       relativeTo: this.route,
       queryParams: {
         q: q || undefined,
         status: st === 'all' ? undefined : st,
+        from: from || undefined,
+        to: to || undefined,
+        trigger: tr === 'all' ? undefined : tr,
       },
       replaceUrl: true,
     });
@@ -377,17 +462,33 @@ export class LogsPageComponent implements OnInit, OnDestroy {
   protected filteredRows(): LogRow[] {
     const q = this.filter().toLowerCase();
     const st = this.statusFilter();
+    let fromD = this.dateFrom().trim();
+    let toD = this.dateTo().trim();
+    if (fromD && toD && fromD > toD) {
+      const t = fromD;
+      fromD = toD;
+      toD = t;
+    }
+    const trig = this.triggerFilter();
     return this.rows().filter((r) => {
+      const tkSearch = (r.trigger_kind ?? '').toLowerCase();
       const textOk = q
-        ? r.workflow_name.toLowerCase().includes(q) || (r.message ?? '').toLowerCase().includes(q) || (r.error ?? '').toLowerCase().includes(q)
+        ? r.workflow_name.toLowerCase().includes(q) ||
+          (r.message ?? '').toLowerCase().includes(q) ||
+          (r.error ?? '').toLowerCase().includes(q) ||
+          tkSearch.includes(q)
         : true;
       const statusOk = st === 'all' || r.status === st;
-      return textOk && statusOk;
+      const day = localDayKey(r.started_at);
+      const fromOk = !fromD || (day !== '' && day >= fromD);
+      const toOk = !toD || (day !== '' && day <= toD);
+      const trigOk = trig === 'all' || (r.trigger_kind ?? '') === trig;
+      return textOk && statusOk && fromOk && toOk && trigOk;
     });
   }
 
   private async reload(): Promise<void> {
-    const logs = (await this.ipc.api.logs.list({ limit: 100 })) as Array<Record<string, unknown>>;
+    const logs = (await this.ipc.api.logs.list({ limit: 500 })) as Array<Record<string, unknown>>;
     const wfMap = new Map((await this.ipc.api.workflows.list()).map((w) => [w.id, w.name]));
     const mapped: LogRow[] = logs.map((l) => ({
       id: String(l['id']),
@@ -397,6 +498,7 @@ export class LogsPageComponent implements OnInit, OnDestroy {
       status: String(l['status'] ?? ''),
       message: (l['message'] as string) ?? null,
       error: (l['error'] as string) ?? null,
+      trigger_kind: (l['trigger_kind'] as string) ?? null,
       workflow_name: wfMap.get(String(l['workflow_id'])) ?? String(l['workflow_id']),
     }));
     this.rows.set(mapped);
