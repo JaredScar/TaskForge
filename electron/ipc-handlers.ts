@@ -514,29 +514,44 @@ export function registerIpcHandlers(
 
   ipcHandle(
     'variables:create',
-    (_e, v: { name: string; type: string; value: string; is_secret?: boolean; scope?: string }) => {
+    (_e, v: { name: string; type: string; value: string; is_secret?: boolean; scope?: string; description?: string }) => {
       assertProEnterprise(db);
-      db.prepare(`INSERT INTO variables (id, name, type, value, is_secret, scope) VALUES (?, ?, ?, ?, ?, ?)`).run(
+      db.prepare(
+        `INSERT INTO variables (id, name, type, value, is_secret, scope, description) VALUES (?, ?, ?, ?, ?, ?, ?)`
+      ).run(
         randomUUID(),
         v.name,
         v.type,
         v.value,
         v.is_secret ? 1 : 0,
-        v.scope ?? 'global'
+        v.scope ?? 'global',
+        String(v.description ?? '').slice(0, 2000)
       );
       writeAuditLog(db, 'variable.create', v.name);
       return true;
     }
   );
 
-  ipcHandle('variables:update', (_e, v: { id: string; name?: string; type?: string; value?: string; is_secret?: boolean }) => {
-    assertProEnterprise(db);
-    db.prepare(
-      `UPDATE variables SET name = COALESCE(?, name), type = COALESCE(?, type), value = COALESCE(?, value), is_secret = COALESCE(?, is_secret) WHERE id = ?`
-    ).run(v.name ?? null, v.type ?? null, v.value ?? null, v.is_secret != null ? (v.is_secret ? 1 : 0) : null, v.id);
-    writeAuditLog(db, 'variable.update', v.id);
-    return true;
-  });
+  ipcHandle(
+    'variables:update',
+    (_e, v: { id: string; name?: string; type?: string; value?: string; is_secret?: boolean; description?: string }) => {
+      assertProEnterprise(db);
+      const desc =
+        v.description !== undefined ? String(v.description).slice(0, 2000) : (null as string | null);
+      db.prepare(
+        `UPDATE variables SET name = COALESCE(?, name), type = COALESCE(?, type), value = COALESCE(?, value), is_secret = COALESCE(?, is_secret), description = COALESCE(?, description) WHERE id = ?`
+      ).run(
+        v.name ?? null,
+        v.type ?? null,
+        v.value ?? null,
+        v.is_secret != null ? (v.is_secret ? 1 : 0) : null,
+        desc,
+        v.id
+      );
+      writeAuditLog(db, 'variable.update', v.id);
+      return true;
+    }
+  );
 
   ipcHandle('variables:delete', (_e, id: string) => {
     assertProEnterprise(db);

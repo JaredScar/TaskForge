@@ -96,6 +96,13 @@ function runMigrations(db: InstanceType<typeof BetterSqlite3>): void {
     }
     db.prepare(`INSERT INTO schema_migrations (version, applied_at) VALUES (5, ?)`).run(now);
   }
+  if (maxVer() < 6) {
+    const cols = db.prepare(`PRAGMA table_info(variables)`).all() as { name: string }[];
+    if (!cols.some((c) => c.name === 'description')) {
+      db.exec(`ALTER TABLE variables ADD COLUMN description TEXT NOT NULL DEFAULT ''`);
+    }
+    db.prepare(`INSERT INTO schema_migrations (version, applied_at) VALUES (6, ?)`).run(now);
+  }
 }
 
 /** Keep primary REST token mirrored in api_keys for scoped API access. */

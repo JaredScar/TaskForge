@@ -98,7 +98,7 @@ export function importDataFromZipBuffer(db: Database.Database, buffer: Buffer): 
       }
 
       const insV = db.prepare(
-        `INSERT INTO variables (id, name, type, value, is_secret, scope) VALUES (?, ?, ?, ?, ?, ?)`
+        `INSERT INTO variables (id, name, type, value, is_secret, scope, description) VALUES (?, ?, ?, ?, ?, ?, ?)`
       );
       for (const v of variables) {
         insV.run(
@@ -107,7 +107,8 @@ export function importDataFromZipBuffer(db: Database.Database, buffer: Buffer): 
           String(v['type'] ?? 'string'),
           String(v['value'] ?? ''),
           Number(v['is_secret'] ?? 0) ? 1 : 0,
-          String(v['scope'] ?? 'global')
+          String(v['scope'] ?? 'global'),
+          String(v['description'] ?? '').slice(0, 2000)
         );
       }
 

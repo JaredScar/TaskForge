@@ -64,7 +64,8 @@ CREATE TABLE IF NOT EXISTS variables (
   type TEXT NOT NULL,
   value TEXT NOT NULL DEFAULT '',
   is_secret INTEGER NOT NULL DEFAULT 0,
-  scope TEXT NOT NULL DEFAULT 'global'
+  scope TEXT NOT NULL DEFAULT 'global',
+  description TEXT NOT NULL DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS audit_logs (
