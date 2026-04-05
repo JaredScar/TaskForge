@@ -1,3 +1,17 @@
+<div align="center">
+
+<img src="docs/taskforge-full.png" alt="TaskForge — wordmark with blue gear, clock face, and orange anvil; tagline: Schedule. Automate. Accomplish." width="480" />
+
+<br /><br />
+
+<img src="docs/taskforge.png" alt="TaskForge app icon — gear, clock, and forging sparks" width="88" />
+
+<br />
+
+<sub>Logos: square icon <code>docs/taskforge.png</code> · full lockup <code>docs/taskforge-full.png</code></sub>
+
+</div>
+
 # TaskForge
 
 Modern desktop automation for Windows — a **Task Scheduler–style** app with a visual workflow builder, triggers, actions, execution logs, and optional AI-assisted drafts.
