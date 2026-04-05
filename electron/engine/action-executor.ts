@@ -11,6 +11,13 @@ import { runScript } from '../actions/run-script.action';
 import { runHttpRequest } from '../actions/http-request.action';
 import { runDarkModeToggle } from '../actions/dark-mode.action';
 import { runAudioControl } from '../actions/audio-control.action';
+import {
+  runDownloadFile,
+  runScreenshotSave,
+  runTcpPortCheck,
+  runWakeOnLan,
+  runZipArchive,
+} from '../actions/pro-actions';
 
 const execFileAsync = promisify(execFile);
 
@@ -222,6 +229,61 @@ export async function executeActionNode(
             error: e instanceof Error ? e.message : String(e),
           };
         }
+      }
+      case 'zip_archive': {
+        const label = String(config['label'] ?? 'Create ZIP');
+        const r = await runZipArchive(config);
+        return r.ok
+          ? {
+              status: 'success',
+              message: label,
+              durationMs: Date.now() - start,
+              output: r.zipPath ?? '',
+            }
+          : { status: 'failure', message: label, durationMs: Date.now() - start, error: r.error };
+      }
+      case 'download_file': {
+        const label = String(config['label'] ?? 'Download file');
+        const r = await runDownloadFile(config);
+        return r.ok
+          ? {
+              status: 'success',
+              message: label,
+              durationMs: Date.now() - start,
+              output: r.bytes != null ? String(r.bytes) : '',
+            }
+          : { status: 'failure', message: label, durationMs: Date.now() - start, error: r.error };
+      }
+      case 'wake_on_lan': {
+        const label = String(config['label'] ?? 'Wake-on-LAN');
+        const r = await runWakeOnLan(config);
+        return r.ok
+          ? { status: 'success', message: label, durationMs: Date.now() - start }
+          : { status: 'failure', message: label, durationMs: Date.now() - start, error: r.error };
+      }
+      case 'tcp_port_check': {
+        const label = String(config['label'] ?? 'TCP port check');
+        const r = await runTcpPortCheck(config);
+        return r.ok
+          ? {
+              status: 'success',
+              message: label,
+              durationMs: Date.now() - start,
+              output: r.open ? 'open' : 'closed',
+            }
+          : { status: 'failure', message: label, durationMs: Date.now() - start, error: r.error };
+      }
+      case 'screenshot_save': {
+        const label = String(config['label'] ?? 'Screenshot');
+        const r = await runScreenshotSave(config);
+        return r.ok
+          ? {
+              status: 'success',
+              message: label,
+              durationMs: Date.now() - start,
+              output: r.path ?? '',
+            }
+          : { status: 'failure', message: label, durationMs: Date.now() - start, error: r.error };
       }
       case 'input_simulation':
         return {

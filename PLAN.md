@@ -893,7 +893,7 @@ All Pro / Enterprise IPC handlers call `assertProEnterprise(db)` or `isProEnterp
 
 **Pro trigger kinds:** `network_change`, `file_change`, `cpu_memory_usage`, `device_connected`
 
-**Pro action kinds:** `run_script`, `http_request`
+**Pro action kinds:** `run_script`, `http_request`, `zip_archive`, `download_file`, `wake_on_lan`, `tcp_port_check`, `screenshot_save`
 
 **Files:** `electron/entitlement.ts`, `electron/ipc-handlers.ts`
 

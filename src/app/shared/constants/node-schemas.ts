@@ -200,6 +200,48 @@ export const NODE_CONFIG_SCHEMAS: Record<string, SchemaField[]> = {
     { key: 'retryCount', label: 'Retries on failure', type: 'number' },
     { key: 'retryDelayMs', label: 'Retry delay (ms)', type: 'number' },
   ],
+  zip_archive: [
+    { key: 'label', label: 'Label', type: 'text' },
+    { key: 'outputPath', label: 'Output .zip path', type: 'text', placeholder: 'C:\\Backups\\archive.zip' },
+    {
+      key: 'sources',
+      label: 'Paths to include (one per line or comma-separated)',
+      type: 'textarea',
+      placeholder: 'C:\\Users\\me\\Documents\\project\nD:\\photo.jpg',
+    },
+  ],
+  download_file: [
+    { key: 'label', label: 'Label', type: 'text' },
+    { key: 'url', label: 'URL', type: 'text', placeholder: 'https://…' },
+    { key: 'destinationPath', label: 'Save as', type: 'text', placeholder: 'C:\\Downloads\\file.bin' },
+  ],
+  wake_on_lan: [
+    { key: 'label', label: 'Label', type: 'text' },
+    { key: 'macAddress', label: 'MAC address', type: 'text', placeholder: 'AA:BB:CC:DD:EE:FF' },
+    { key: 'broadcast', label: 'Broadcast IP', type: 'text', placeholder: '255.255.255.255' },
+    { key: 'port', label: 'UDP port (usually 7 or 9)', type: 'number' },
+  ],
+  tcp_port_check: [
+    { key: 'label', label: 'Label', type: 'text' },
+    { key: 'host', label: 'Host', type: 'text', placeholder: '127.0.0.1' },
+    { key: 'port', label: 'Port', type: 'number' },
+    { key: 'timeoutMs', label: 'Timeout (ms)', type: 'number' },
+    {
+      key: 'expectOpen',
+      label: 'Expect port open',
+      type: 'select',
+      options: [
+        { value: 'true', label: 'Yes — fail if closed' },
+        { value: 'false', label: 'No — fail if open (expect closed)' },
+      ],
+    },
+  ],
+  screenshot_save: [
+    { key: 'label', label: 'Label', type: 'text' },
+    { key: 'path', label: 'PNG file path', type: 'text', placeholder: 'C:\\Screens\\cap.png' },
+    { key: 'width', label: 'Capture width (px)', type: 'number' },
+    { key: 'height', label: 'Capture height (px)', type: 'number' },
+  ],
   kill_process: [
     { key: 'label', label: 'Label', type: 'text' },
     { key: 'processName', label: 'Process name (.exe)', type: 'text', placeholder: 'notepad.exe' },

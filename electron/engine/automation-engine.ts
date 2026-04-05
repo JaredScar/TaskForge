@@ -173,6 +173,20 @@ export class AutomationEngine {
             if (node.kind === 'run_script' && ar.output != null && ar.output !== '') {
               context.stdout = ar.output;
             }
+            if (node.kind === 'zip_archive' && ar.output != null && ar.output !== '') {
+              context.zipPath = ar.output;
+            }
+            if (node.kind === 'download_file') {
+              const dest = String(cfg['destinationPath'] ?? '').trim();
+              if (dest) context.downloadPath = dest;
+              if (ar.output != null && ar.output !== '') context.downloadBytes = ar.output;
+            }
+            if (node.kind === 'tcp_port_check' && ar.output != null && ar.output !== '') {
+              context.portOpen = ar.output;
+            }
+            if (node.kind === 'screenshot_save' && ar.output != null && ar.output !== '') {
+              context.screenshotPath = ar.output;
+            }
           }
         }
       }

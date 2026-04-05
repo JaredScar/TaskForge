@@ -25,6 +25,11 @@ const BASIC: ActionItem[] = [
 const ADVANCED: ActionItem[] = [
   { kind: 'run_script', title: 'Run Script', desc: 'PowerShell or batch file', icon: '⌨', pro: true },
   { kind: 'http_request', title: 'HTTP Request', desc: 'Call APIs and webhooks', icon: '🌐', pro: true },
+  { kind: 'zip_archive', title: 'Create ZIP', desc: 'Archive files or folders', icon: '🗜', pro: true },
+  { kind: 'download_file', title: 'Download file', desc: 'Fetch a URL to disk (streaming)', icon: '⬇', pro: true },
+  { kind: 'wake_on_lan', title: 'Wake-on-LAN', desc: 'Magic packet to wake a device', icon: '⚡', pro: true },
+  { kind: 'tcp_port_check', title: 'TCP port check', desc: 'Health-check a host and port', icon: '🔌', pro: true },
+  { kind: 'screenshot_save', title: 'Screenshot', desc: 'Capture screen to PNG', icon: '📸', pro: true },
 ];
 
 @Component({
@@ -66,7 +71,7 @@ const ADVANCED: ActionItem[] = [
         }
       </div>
       <h2 class="mt-8 text-sm font-medium text-tf-muted">Advanced (Pro)</h2>
-      <div class="mt-3 grid gap-3 sm:grid-cols-2">
+      <div class="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         @for (a of advanced; track a.kind) {
           <div
             class="flex flex-col rounded-xl border border-tf-border bg-tf-card p-4 transition-colors hover:border-tf-green/35"

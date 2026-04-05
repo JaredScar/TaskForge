@@ -21,7 +21,15 @@ export const PRO_TRIGGER_KINDS = new Set([
   'memory_trigger',
   'device_trigger',
 ]);
-export const PRO_ACTION_KINDS = new Set(['run_script', 'http_request']);
+export const PRO_ACTION_KINDS = new Set([
+  'run_script',
+  'http_request',
+  'zip_archive',
+  'download_file',
+  'wake_on_lan',
+  'tcp_port_check',
+  'screenshot_save',
+]);
 
 function entitlementSecretCandidates(): readonly string[] {
   const e = process.env.TASKFORGE_ENTITLEMENT_SECRET?.trim();

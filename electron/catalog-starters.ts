@@ -47,6 +47,16 @@ export function defaultActionConfig(kind: string): Record<string, unknown> {
       return { path: '', shell: 'powershell', label: 'Run script' };
     case 'http_request':
       return { method: 'GET', url: 'https://example.com', label: 'HTTP request' };
+    case 'zip_archive':
+      return { outputPath: '', sources: '', label: 'Create ZIP' };
+    case 'download_file':
+      return { url: 'https://example.com/file.bin', destinationPath: '', label: 'Download file' };
+    case 'wake_on_lan':
+      return { macAddress: '00:11:22:33:44:55', broadcast: '255.255.255.255', port: 9, label: 'Wake-on-LAN' };
+    case 'tcp_port_check':
+      return { host: '127.0.0.1', port: 80, timeoutMs: 5000, expectOpen: true, label: 'Port check' };
+    case 'screenshot_save':
+      return { path: '', width: 1920, height: 1080, label: 'Screenshot' };
     case 'kill_process':
       return { processName: 'notepad.exe', label: 'Kill process' };
     case 'file_operation':

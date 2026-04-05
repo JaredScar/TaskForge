@@ -389,6 +389,40 @@ export class BuilderPageComponent implements OnInit, OnDestroy {
         msgs.push(`HTTP action “${this.label(n)}” needs a URL.`);
         bad.add(n.id);
       }
+      if (n.kind === 'zip_archive') {
+        if (!String(cfg['outputPath'] ?? '').trim()) {
+          msgs.push(`ZIP action “${this.label(n)}” needs an output .zip path.`);
+          bad.add(n.id);
+        }
+        const src = cfg['sources'];
+        const hasSrc =
+          (typeof src === 'string' && src.trim().length > 0) || (Array.isArray(src) && src.length > 0);
+        if (!hasSrc) {
+          msgs.push(`ZIP action “${this.label(n)}” needs at least one source path.`);
+          bad.add(n.id);
+        }
+      }
+      if (n.kind === 'download_file') {
+        if (!String(cfg['url'] ?? '').trim() || !String(cfg['destinationPath'] ?? '').trim()) {
+          msgs.push(`Download file “${this.label(n)}” needs URL and destination path.`);
+          bad.add(n.id);
+        }
+      }
+      if (n.kind === 'wake_on_lan' && !String(cfg['macAddress'] ?? '').trim()) {
+        msgs.push(`Wake-on-LAN “${this.label(n)}” needs a MAC address.`);
+        bad.add(n.id);
+      }
+      if (n.kind === 'tcp_port_check') {
+        const p = Number(cfg['port'] ?? 0);
+        if (!Number.isFinite(p) || p < 1 || p > 65535) {
+          msgs.push(`TCP port check “${this.label(n)}” needs a valid port (1–65535).`);
+          bad.add(n.id);
+        }
+      }
+      if (n.kind === 'screenshot_save' && !String(cfg['path'] ?? '').trim()) {
+        msgs.push(`Screenshot “${this.label(n)}” needs an output PNG path.`);
+        bad.add(n.id);
+      }
       if (n.kind === 'app_launch' && !String(cfg['process'] ?? '').trim()) {
         msgs.push(`App launch trigger “${this.label(n)}” needs a process name.`);
         bad.add(n.id);
