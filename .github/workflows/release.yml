@@ -1,6 +1,20 @@
-# Windows: NSIS installer (.exe). macOS: .dmg for x64 and arm64.
-# Create a GitHub Release: git tag v2.1.0 && git push origin v2.1.0
-# workflow_dispatch: builds installers only; download from the workflow run’s Artifacts (no Release unless you used a tag push).
+# Build TaskForge release artifacts and attach them to a GitHub Release.
+#
+# Windows: NSIS setup (.exe) + portable (.exe) — both uploaded.
+# macOS:    .dmg for x64 and arm64 (electron-builder; dmg.sign=false in package.json for unsigned CI builds).
+#
+# Trigger:
+#   • Tag push:   git tag v2.1.0 && git push origin v2.1.0  → builds + creates/updates the GitHub Release.
+#   • Manual run: Actions → Release → Run workflow          → builds only; download Artifacts (no Release).
+#
+# Before tagging: bump "version" in package.json to match the tag (e.g. v2.1.0 → 2.1.0).
+#
+# Optional — Windows code signing (set repo secrets):
+#   CSC_LINK (base64 .pfx or URL), CSC_KEY_PASSWORD
+# Optional — macOS signing + notarization (set secrets, remove CSC_IDENTITY_AUTO_DISCOVERY=false, adjust package.json dmg.sign):
+#   APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID, CSC_LINK, CSC_KEY_PASSWORD, etc.
+# See: https://www.electron.build/code-signing
+
 name: Release
 
 on:
@@ -9,55 +23,86 @@ on:
       - 'v*'
   workflow_dispatch:
 
+concurrency:
+  group: release-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: write
 
 jobs:
   build-windows:
+    name: Windows (NSIS + portable)
     runs-on: windows-latest
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
 
+      - name: Cache Electron
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/electron
+            ~/.cache/electron-builder
+          key: electron-cache-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            electron-cache-${{ runner.os }}-
+
       - name: Install dependencies
         run: npm ci
 
-      - name: Build app (Angular + Electron main)
+      - name: Build Angular + Electron main
         run: npm run build:all
 
-      - name: Package Windows installer
-        run: npx electron-builder --win nsis --publish never
+      - name: Package Windows (installer + portable .exe)
+        run: npx electron-builder --win nsis portable --publish never
 
-      - name: Upload Windows artifact
+      - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: windows-installer
-          path: release/*.exe
+          name: taskforge-windows
+          path: |
+            release/*.exe
+          if-no-files-found: error
 
   build-mac:
+    name: macOS (DMG x64 + arm64)
     runs-on: macos-latest
+    timeout-minutes: 45
     env:
+      # Unsigned local/CI builds; avoids hanging on Apple Developer lookup. Set secrets + enable signing in package.json for release signing.
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
 
+      - name: Cache Electron
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/electron
+            ~/.cache/electron-builder
+          key: electron-cache-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            electron-cache-${{ runner.os }}-
+
       - name: Install dependencies
         run: npm ci
 
-      - name: Build app (Angular + Electron main)
+      - name: Build Angular + Electron main
         run: npm run build:all
 
       - name: Package macOS disk images
@@ -66,31 +111,38 @@ jobs:
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: mac-dmg
-          path: release/*.dmg
+          name: taskforge-macos-dmg
+          path: |
+            release/*.dmg
+          if-no-files-found: error
 
   publish:
+    name: Publish GitHub Release
     needs: [build-windows, build-mac]
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     steps:
-      - name: Download all artifacts
+      - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
-          pattern: '*'
+          pattern: 'taskforge-*'
           merge-multiple: true
 
-      - name: Flatten artifacts for release
+      - name: Collect release files
         run: |
           mkdir -p dist
-          find artifacts -type f \( -name '*.exe' -o -name '*.dmg' \) -exec cp -f {} dist/ \;
+          find artifacts -type f \( -name '*.exe' -o -name '*.dmg' \) -print -exec cp -f {} dist/ \;
+          echo "Files to upload:"
           ls -la dist/
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.ref_name }}
+          name: TaskForge ${{ github.ref_name }}
           files: dist/*
           generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
