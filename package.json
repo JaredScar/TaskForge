@@ -18,7 +18,8 @@
     "electron": "npm run build:electron && electron .",
     "electron:pack": "npm run build:all && electron-builder --dir",
     "electron:dist": "npm run build:all && electron-builder",
-    "postinstall": "electron-rebuild -f -w better-sqlite3"
+    "icons:win": "node scripts/generate-taskforge-ico.mjs",
+    "postinstall": "electron-rebuild -f -w better-sqlite3 && node scripts/brand-electron-dev-exe.mjs"
   },
   "private": true,
   "build": {
@@ -39,6 +40,7 @@
       "**/node_modules/better-sqlite3/**/*"
     ],
     "win": {
+      "icon": "public/taskforge.ico",
       "target": [
         "nsis"
       ]
@@ -110,7 +112,9 @@
     "karma-coverage": "~2.2.0",
     "karma-jasmine": "~5.1.0",
     "karma-jasmine-html-reporter": "~2.1.0",
+    "png-to-ico": "^3.0.1",
     "postcss": "^8.5.8",
+    "rcedit": "^5.0.2",
     "tailwindcss": "^4.2.2",
     "typescript": "~5.7.2",
     "wait-on": "^9.0.4"

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, Menu, Tray, nativeImage } from 'electron';
+import { app, BrowserWindow, dialog, Menu, Tray, nativeImage, type NativeImage } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -19,20 +19,60 @@ let isQuitting = false;
 /** Held for graceful WAL checkpoint + close on quit (avoids “lost” data after abrupt dev restarts). */
 let appDb: ReturnType<typeof openDatabase> | null = null;
 
-/** Resolve a file under `public/` for both dev (`dist-electron/../public`) and packaged app. */
-function resolvePublicAsset(fileName: string): string | undefined {
-  const candidates = [
-    path.join(__dirname, '..', 'public', fileName),
-    path.join(app.getAppPath(), 'public', fileName),
+/** Prefer `.ico` on Windows (Electron’s recommendation); keeps taskbar/window chrome reliable. */
+function taskforgeIconFileNames(): string[] {
+  return process.platform === 'win32' ? ['taskforge.ico', 'taskforge.png'] : ['taskforge.png', 'taskforge.ico'];
+}
+
+/** Transparent app logo — avoid `favicon.ico` in the page head or Chromium replaces the window icon. */
+function resolveTaskforgeIconPath(): string | undefined {
+  const roots = [
+    path.join(__dirname, '..', 'public'),
+    path.join(__dirname, '..'),
+    path.join(app.getAppPath(), 'public'),
+    app.getAppPath(),
+    path.join(process.cwd(), 'public'),
+    process.cwd(),
   ];
-  for (const p of candidates) {
-    try {
-      if (fs.existsSync(p)) return p;
-    } catch {
-      /* ignore */
+  for (const root of roots) {
+    for (const name of taskforgeIconFileNames()) {
+      const p = path.join(root, name);
+      try {
+        if (fs.existsSync(p)) return p;
+      } catch {
+        /* ignore */
+      }
     }
   }
   return undefined;
+}
+
+function loadWindowIcon(): NativeImage | undefined {
+  const p = resolveTaskforgeIconPath();
+  if (!p) return undefined;
+  try {
+    const img = nativeImage.createFromPath(p);
+    return img.isEmpty() ? undefined : img;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Tray sizes are small; scale down on Windows while keeping PNG alpha. */
+function loadTrayIcon(): NativeImage {
+  const p = resolveTaskforgeIconPath();
+  if (!p) return nativeImage.createEmpty();
+  try {
+    let img = nativeImage.createFromPath(p);
+    if (img.isEmpty()) return nativeImage.createEmpty();
+    if (process.platform === 'win32') {
+      const { width } = img.getSize();
+      if (width > 32) img = img.resize({ width: 32 });
+    }
+    return img;
+  } catch {
+    return nativeImage.createEmpty();
+  }
 }
 
 function shutdownDatabase(): void {
@@ -52,7 +92,7 @@ function shutdownDatabase(): void {
 }
 
 function createWindow(): void {
-  const iconPath = resolvePublicAsset('taskforge.png');
+  const windowIcon = loadWindowIcon();
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -60,7 +100,7 @@ function createWindow(): void {
     minHeight: 640,
     backgroundColor: '#0a0a0a',
     show: false,
-    ...(iconPath ? { icon: iconPath } : {}),
+    ...(windowIcon ? { icon: windowIcon } : {}),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -69,7 +109,18 @@ function createWindow(): void {
     },
   });
 
-  mainWindow.once('ready-to-show', () => mainWindow?.show());
+  const reapplyWindowIcon = (): void => {
+    if (windowIcon && mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.setIcon(windowIcon);
+    }
+  };
+  /* Remote URL / SPA can adopt the document favicon and override the Windows taskbar icon — reset after load. */
+  mainWindow.webContents.on('did-finish-load', reapplyWindowIcon);
+
+  mainWindow.once('ready-to-show', () => {
+    reapplyWindowIcon();
+    mainWindow?.show();
+  });
 
   if (isDev) {
     void mainWindow.loadURL('http://127.0.0.1:4200');
@@ -91,28 +142,10 @@ function createWindow(): void {
 }
 
 function createTray(): void {
-  let img = nativeImage.createEmpty();
-  const pngPath = resolvePublicAsset('taskforge.png');
-  const tryPath = (filePath: string): boolean => {
-    try {
-      if (!fs.existsSync(filePath)) return false;
-      let i = nativeImage.createFromPath(filePath);
-      if (i.isEmpty()) return false;
-      if (process.platform === 'win32' && filePath.endsWith('.png')) {
-        const { width, height } = i.getSize();
-        if (width > 32 || height > 32) {
-          i = i.resize({ width: 32, height: 32 });
-        }
-      }
-      img = i;
-      return true;
-    } catch {
-      return false;
-    }
-  };
-  if (!pngPath || !tryPath(pngPath)) {
-    const ico = resolvePublicAsset('favicon.ico');
-    if (ico) tryPath(ico);
+  const img = loadTrayIcon();
+  if (img.isEmpty()) {
+    console.error('[taskforge] taskforge.png not found — system tray disabled');
+    return;
   }
   tray = new Tray(img);
   tray.setToolTip('TaskForge');
