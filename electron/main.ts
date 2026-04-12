@@ -245,6 +245,16 @@ void app
       void refreshLicenseOnline(db).catch(() => undefined);
     }
 
+    // Keep online entitlement fresh while the app is open.
+    // This is intentionally "best effort": failures should not break UX because cached grace may keep users unlocked.
+    if (licenseUrl && licenseMode !== 'local' && readStoredEntitlementKey(db).trim()) {
+      const MS_PER_HOUR = 60 * 60 * 1000;
+      const REFRESH_INTERVAL_MS = 24 * MS_PER_HOUR; // §20.9 guidance: 12–24h; pick 24h for reduced traffic.
+      setInterval(() => {
+        void refreshLicenseOnline(db).catch(() => undefined);
+      }, REFRESH_INTERVAL_MS);
+    }
+
     triggers.reloadFromDatabase();
     triggers.runStartupTriggers();
 

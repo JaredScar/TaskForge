@@ -75,6 +75,11 @@ import { LoadingService } from '../../core/services/loading.service';
         @if (entitlementStatus() === 'ok') {
           <p class="mt-2 text-xs text-tf-green">License accepted — Pro and Enterprise features are unlocked.</p>
         }
+        @if (entitlementStatus() === 'ok' && entitlementGrace()) {
+          <p class="mt-2 text-xs text-tf-muted">
+            Online verification failed, but cached grace keeps you unlocked until the next successful check.
+          </p>
+        }
         @if (entitlementStatus() === 'invalid') {
           <p class="mt-2 text-xs text-red-300">That key is not valid for this build (check secret / format / server).</p>
         }
@@ -358,6 +363,8 @@ export class SettingsPageComponent implements OnInit {
   protected readonly licenseLastVerifiedAt = signal<string | null>(null);
   protected readonly licenseValidUntilDisplay = signal<string | null>(null);
   protected readonly licenseSeats = signal<number | null>(null);
+  // When a remote license check fails, cached "valid-until" may still keep Pro unlocked.
+  protected readonly entitlementGrace = signal(false);
 
   async ngOnInit(): Promise<void> {
     await this.loading.run(() => this.loadSettingsForm());
@@ -384,6 +391,7 @@ export class SettingsPageComponent implements OnInit {
     this.licenseLastVerifiedAt.set(st.licenseLastVerifiedAt ?? null);
     this.licenseValidUntilDisplay.set(st.licenseValidUntil ?? null);
     this.licenseSeats.set(st.seats ?? null);
+    this.entitlementGrace.set(false);
 
     const v = await this.ipc.api.settings.get('openai_api_key');
     this.openaiKey = v ?? '';
@@ -432,6 +440,7 @@ export class SettingsPageComponent implements OnInit {
 
   async saveEntitlement(): Promise<void> {
     this.entitlementStatus.set('unset');
+    this.entitlementGrace.set(false);
     const res = await this.ipc.api.entitlement.setKey(this.entitlementKey);
     if (res.ok) {
       this.entitlementStatus.set(res.unlocked ? 'ok' : 'unset');
@@ -452,13 +461,19 @@ export class SettingsPageComponent implements OnInit {
 
   async refreshLicenseOnline(): Promise<void> {
     const r = await this.ipc.api.entitlement.refreshOnline();
-    if (r.ok && r.unlocked) {
+    this.entitlementGrace.set(false);
+    if (r.unlocked) {
+      // Server/network failed but cached valid-until still keeps entitlement active.
+      if (!r.ok) this.entitlementGrace.set(true);
       this.entitlementStatus.set('ok');
-      this.toast.success('License verified');
+      this.toast.success(!r.ok ? 'License still unlocked (cached grace).' : 'License verified');
       await this.loadSettingsForm();
-    } else {
-      this.toast.error(r.error ? `Check failed: ${r.error}` : 'License check failed');
+      return;
     }
+
+    // Not unlocked after refresh => verification failed.
+    this.entitlementStatus.set(r.ok ? 'invalid' : 'network');
+    this.toast.error(r.error ? `Check failed: ${r.error}` : 'License check failed');
   }
 
   async clearEntitlement(): Promise<void> {
