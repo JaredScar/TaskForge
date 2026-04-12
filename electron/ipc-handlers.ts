@@ -314,6 +314,18 @@ export function registerIpcHandlers(
     return true;
   });
 
+  ipcHandle('workflows:setReplayMissed', (_e, payload: { id: string; replayMissed: boolean }) => {
+    const wf = db.prepare(`SELECT id FROM workflows WHERE id = ?`).get(payload.id);
+    if (!wf) return false;
+    db.prepare(`UPDATE workflows SET replay_missed = ?, updated_at = ? WHERE id = ?`).run(
+      payload.replayMissed ? 1 : 0,
+      new Date().toISOString(),
+      payload.id
+    );
+    writeAuditLog(db, 'workflow.update', payload.id);
+    return true;
+  });
+
   ipcHandle('workflows:duplicate', (_e, sourceId: string) => {
     const wf = db.prepare(`SELECT * FROM workflows WHERE id = ?`).get(sourceId) as Record<string, unknown> | undefined;
     if (!wf) return '';

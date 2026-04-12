@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { IpcService } from '../../core/services/ipc.service';
@@ -141,12 +141,30 @@ function trimConversationForModel(turns: ChatTurn[]): ChatTurn[] {
     </div>
   `,
 })
-export class AiAssistantPageComponent {
+export class AiAssistantPageComponent implements OnInit {
   private readonly ipc = inject(IpcService);
   private readonly toast = inject(ToastService);
   protected readonly suggestions = SUGGESTIONS;
+  protected readonly isViewer = signal(false);
   protected promptText = '';
   protected readonly busy = signal(false);
+
+  ngOnInit(): void {
+    void this.loadViewerFlag();
+  }
+
+  private async loadViewerFlag(): Promise<void> {
+    try {
+      const { unlocked } = await this.ipc.api.entitlement.getStatus();
+      if (unlocked) {
+        const team = (await this.ipc.api.team.list()) as Array<{ is_self: number; role: string }>;
+        const self = team.find((m) => m.is_self === 1);
+        this.isViewer.set(self?.role === 'Viewer');
+      }
+    } catch {
+      /* treat as non-viewer */
+    }
+  }
   protected readonly preview = signal<DraftPreview | null>(null);
   protected readonly draftWorkflowId = signal<string | null>(null);
   protected readonly errorText = signal('');
@@ -157,6 +175,7 @@ export class AiAssistantPageComponent {
   protected refineLastDraft = false;
 
   async send(): Promise<void> {
+    if (this.isViewer()) { this.toast.warning('Viewers cannot create workflows via AI.'); return; }
     const text = this.promptText.trim();
     if (!text || this.busy()) return;
     this.busy.set(true);

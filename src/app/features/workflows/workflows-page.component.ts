@@ -30,23 +30,25 @@ interface LastRunDetail {
   selector: 'app-workflows-page',
   imports: [FormsModule, RouterLink, NgClass, TitleCasePipe, EmptyStateComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  styles: [`.wf-glow { box-shadow: 0 0 14px rgba(34,197,94,0.35); }`],
   template: `
     <div class="flex flex-col gap-4 pb-16">
       <div class="flex flex-wrap items-center justify-between gap-3">
-        <h1 class="text-xl font-semibold">Workflows</h1>
+        <h1 class="text-xl font-semibold tracking-tight text-neutral-100">Workflows</h1>
         <div class="flex flex-wrap items-center gap-2">
           <input
             type="search"
             data-tf-focus-search
             [ngModel]="searchQuery()"
             (ngModelChange)="searchQuery.set($event)"
-            placeholder="Search workflows..."
-            class="h-9 w-56 rounded-lg border border-tf-border bg-tf-card px-3 text-sm outline-none ring-tf-green focus:ring-1"
+            placeholder="Search workflows…"
+            class="h-9 w-56 rounded-xl border border-tf-border bg-tf-card px-3 text-sm text-neutral-200 placeholder:text-tf-muted outline-none focus:border-tf-green/50 focus:ring-1 focus:ring-tf-green/30"
           />
           @if (!isViewer() && list().length > 0) {
-            <label class="flex cursor-pointer items-center gap-2 text-xs text-tf-muted">
+            <label class="flex cursor-pointer items-center gap-1.5 text-xs text-tf-muted hover:text-neutral-300">
               <input
                 type="checkbox"
+                class="rounded border-tf-border accent-tf-green"
                 [checked]="allFilteredSelected()"
                 (change)="toggleSelectAll($event)"
               />
@@ -57,7 +59,7 @@ interface LastRunDetail {
             <button
               type="button"
               (click)="newWorkflow()"
-              class="h-9 rounded-lg bg-white px-4 text-sm font-medium text-black hover:bg-neutral-200"
+              class="h-9 rounded-xl bg-white px-4 text-sm font-semibold text-black shadow-sm hover:bg-neutral-100"
             >
               + New Workflow
             </button>
@@ -111,89 +113,131 @@ interface LastRunDetail {
         } @else {
           <div class="grid gap-3 md:grid-cols-2">
             @for (w of filtered(); track w.id) {
-              <article class="rounded-xl border border-tf-border bg-tf-card p-4">
-                <div class="flex items-start justify-between gap-2">
-                  <div class="flex items-start gap-3">
+              <article
+                class="group relative rounded-xl border bg-tf-card shadow-sm transition-all duration-150 hover:shadow-md"
+                [ngClass]="w.enabled ? 'border-green-500/30' : 'border-tf-border'"
+              >
+                @if (w.enabled) {
+                  <div class="absolute inset-y-0 left-0 w-[3px] rounded-l-xl bg-tf-green"></div>
+                }
+                <div class="p-4" [class.pl-5]="w.enabled">
+                  <div class="flex items-start justify-between gap-2">
+                    <div class="flex items-start gap-3">
+                      @if (!isViewer()) {
+                        <input
+                          type="checkbox"
+                          class="mt-1.5 h-3.5 w-3.5 rounded border-tf-border accent-tf-green"
+                          [checked]="selectedIds().has(w.id)"
+                          (change)="toggleSelect(w.id, $event)"
+                          (click)="$event.stopPropagation()"
+                        />
+                      }
+                      <button
+                        type="button"
+                        (click)="toggle(w)"
+                        class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-all"
+                        [ngClass]="w.enabled ? 'bg-tf-green text-black wf-glow' : 'border border-tf-border bg-tf-surface text-neutral-500'"
+                        [disabled]="isViewer()"
+                        title="Enable / disable"
+                      >
+                        @if (w.enabled) {
+                          <svg width="10" height="12" viewBox="0 0 10 12" fill="currentColor"><polygon points="0,0 10,6 0,12"/></svg>
+                        } @else {
+                          <svg width="10" height="11" viewBox="0 0 10 11" fill="currentColor"><rect x="0" y="0" width="3.5" height="11" rx="1"/><rect x="6.5" y="0" width="3.5" height="11" rx="1"/></svg>
+                        }
+                      </button>
+                      <div class="min-w-0 flex-1">
+                        <h2 class="truncate font-medium text-neutral-100">{{ w.name }}</h2>
+                        <p class="mt-0.5 truncate text-xs text-tf-muted">{{ triggerLabel(w) }}</p>
+                        <div class="mt-2 flex flex-wrap items-center gap-1.5">
+                          @if (w.last_run_summary) {
+                            <span
+                              class="inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-medium"
+                              [ngClass]="lastRunClass(w.last_run_summary)"
+                            >{{ w.last_run_summary }}</span>
+                          } @else {
+                            <span class="rounded-md bg-neutral-800/80 px-1.5 py-0.5 text-[10px] text-neutral-500">Never run</span>
+                          }
+                          <span class="text-[10px] tabular-nums text-tf-muted">{{ w.run_count }} runs</span>
+                        </div>
+                      </div>
+                    </div>
+                    <span
+                      class="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 ring-inset"
+                      [ngClass]="priorityClass(w.priority)"
+                    >{{ w.priority | titlecase }}</span>
+                  </div>
+                  <div class="mt-3 flex flex-wrap items-center gap-1.5">
                     @if (!isViewer()) {
-                      <input
-                        type="checkbox"
-                        class="mt-2 h-4 w-4 rounded border-tf-border"
-                        [checked]="selectedIds().has(w.id)"
-                        (change)="toggleSelect(w.id, $event)"
-                        (click)="$event.stopPropagation()"
-                      />
+                      <a
+                        [routerLink]="['/builder', w.id]"
+                        class="rounded-md border border-tf-green/30 bg-tf-green/8 px-2.5 py-1 text-[11px] font-medium text-tf-green hover:border-tf-green/50 hover:bg-tf-green/15"
+                      >Edit</a>
+                    } @else {
+                      <span class="rounded-md border border-tf-border px-2.5 py-1 text-[11px] text-tf-muted">View only</span>
                     }
                     <button
                       type="button"
-                      (click)="toggle(w)"
-                      class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-tf-border"
-                      [class.bg-tf-green]="w.enabled"
-                      [class.text-black]="w.enabled"
-                      [class.text-neutral-500]="!w.enabled"
-                      [disabled]="isViewer()"
-                      title="Enable / disable"
+                      (click)="runNow(w.id)"
+                      class="rounded-md border border-tf-border px-2.5 py-1 text-[11px] text-neutral-400 hover:border-neutral-600 hover:text-neutral-200"
                     >
-                      @if (w.enabled) {
-                        <span class="text-lg">▶</span>
+                      @if (runningId() === w.id) {
+                        <span class="inline-flex items-center gap-1.5">
+                          <span class="inline-block h-2.5 w-2.5 animate-spin rounded-full border border-neutral-500 border-t-transparent"></span>
+                          Running…
+                        </span>
                       } @else {
-                        <span class="text-lg">❚❚</span>
+                        Test run
                       }
                     </button>
-                    <div>
-                      <h2 class="font-medium">{{ w.name }}</h2>
-                      <p class="mt-1 text-xs text-tf-muted">{{ triggerLabel(w) }}</p>
-                      <div class="mt-2 flex flex-wrap items-center gap-2 text-xs text-tf-muted">
-                        <span>{{ w.last_run_summary ?? 'Never' }}</span>
-                        <span>|</span>
-                        <span>{{ w.run_count }} runs</span>
-                      </div>
-                    </div>
-                  </div>
-                  <span
-                    class="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium"
-                    [ngClass]="priorityClass(w.priority)"
-                  >
-                    {{ w.priority | titlecase }}
-                  </span>
-                </div>
-                <div class="mt-3 flex flex-wrap gap-2">
-                  @if (!isViewer()) {
-                    <a [routerLink]="['/builder', w.id]" class="text-xs text-tf-green hover:underline">Edit in Builder</a>
-                  } @else {
-                    <span class="text-xs text-tf-muted">View only</span>
-                  }
-                  <button type="button" (click)="runNow(w.id)" class="text-xs text-neutral-400 hover:text-white">
-                    @if (runningId() === w.id) {
-                      <span class="inline-block h-3 w-3 animate-spin rounded-full border border-neutral-500 border-t-transparent"></span>
-                    } @else {
-                      Test run
+                    <button
+                      type="button"
+                      (click)="toggleLastRun(w.id)"
+                      class="rounded-md border border-tf-border px-2.5 py-1 text-[11px] text-neutral-400 hover:border-neutral-600 hover:text-neutral-200"
+                    >{{ lastRunPanelId() === w.id ? 'Hide run' : 'Last run' }}</button>
+                    @if (!isViewer()) {
+                      <button
+                        type="button"
+                        (click)="duplicateWorkflow(w)"
+                        class="rounded-md border border-tf-border px-2.5 py-1 text-[11px] text-neutral-400 hover:border-neutral-600 hover:text-neutral-200"
+                      >Duplicate</button>
+                      <button
+                        type="button"
+                        (click)="remove(w.id)"
+                        class="rounded-md border border-red-500/20 px-2.5 py-1 text-[11px] text-red-400 hover:bg-red-500/10"
+                      >Delete</button>
+                      <label
+                        class="flex cursor-pointer items-center gap-1 text-[11px] text-neutral-500 hover:text-neutral-300"
+                        title="Replay this workflow if its scheduled cron was missed during downtime"
+                      >
+                        <input
+                          type="checkbox"
+                          class="h-3 w-3 accent-tf-green"
+                          [checked]="w.replay_missed === 1"
+                          (change)="toggleReplayMissed(w, $event)"
+                        />
+                        Replay missed
+                      </label>
                     }
-                  </button>
-                  <button type="button" (click)="toggleLastRun(w.id)" class="text-xs text-neutral-400 hover:text-white">
-                    {{ lastRunPanelId() === w.id ? 'Hide last run' : 'View last run' }}
-                  </button>
-                  @if (!isViewer()) {
-                    <button type="button" (click)="duplicateWorkflow(w)" class="text-xs text-neutral-400 hover:text-white">Duplicate</button>
-                    <button type="button" (click)="remove(w.id)" class="text-xs text-red-400 hover:underline">Delete</button>
-                  }
-                </div>
-                @if (lastRunPanelId() === w.id) {
-                  <div class="mt-3 rounded-lg border border-tf-border bg-tf-bg p-3 text-xs text-neutral-300">
-                    @if (lastRunDetail(); as lr) {
-                      <p class="font-mono text-[10px] text-tf-muted">{{ lr.started_at }} · {{ lr.status }}</p>
-                      <p class="mt-1">{{ lr.message || '—' }}</p>
-                      @if (lr.steps.length) {
-                        <ul class="mt-2 space-y-1 font-mono text-[10px] text-neutral-500">
-                          @for (s of lr.steps; track $index) {
-                            <li>{{ s.step_kind }} — {{ s.status }} — {{ s.message }}</li>
-                          }
-                        </ul>
+                  </div>
+                  @if (lastRunPanelId() === w.id) {
+                    <div class="mt-3 rounded-lg border border-tf-border bg-tf-bg p-3 text-xs text-neutral-300">
+                      @if (lastRunDetail(); as lr) {
+                        <p class="font-mono text-[10px] text-tf-muted">{{ lr.started_at }} · {{ lr.status }}</p>
+                        <p class="mt-1">{{ lr.message || '—' }}</p>
+                        @if (lr.steps.length) {
+                          <ul class="mt-2 space-y-1 font-mono text-[10px] text-neutral-500">
+                            @for (s of lr.steps; track $index) {
+                              <li>{{ s.step_kind }} — {{ s.status }} — {{ s.message }}</li>
+                            }
+                          </ul>
+                        }
+                      } @else {
+                        <p class="text-tf-muted">Loading…</p>
                       }
-                    } @else {
-                      <p class="text-tf-muted">Loading…</p>
-                    }
-                  </div>
-                }
+                    </div>
+                  }
+                </div>
               </article>
             }
           </div>
@@ -202,19 +246,14 @@ interface LastRunDetail {
     </div>
     @if (!isViewer() && selectedIds().size > 0) {
       <div
-        class="fixed bottom-6 left-1/2 z-40 flex -translate-x-1/2 flex-wrap items-center gap-2 rounded-xl border border-tf-border bg-tf-card px-4 py-3 shadow-xl"
+        class="fixed bottom-6 left-1/2 z-40 flex -translate-x-1/2 flex-wrap items-center gap-2 rounded-2xl border border-tf-border/80 bg-tf-surface/95 px-4 py-2.5 shadow-2xl backdrop-blur-sm"
       >
-        <span class="text-sm text-neutral-300">{{ selectedIds().size }} selected</span>
-        <button type="button" class="rounded-lg bg-tf-green px-3 py-1.5 text-xs font-medium text-black" (click)="bulkSetEnabled(true)">
-          Enable
-        </button>
-        <button type="button" class="rounded-lg border border-tf-border px-3 py-1.5 text-xs text-neutral-200" (click)="bulkSetEnabled(false)">
-          Disable
-        </button>
-        <button type="button" class="rounded-lg border border-red-500/40 px-3 py-1.5 text-xs text-red-300" (click)="bulkDelete()">
-          Delete
-        </button>
-        <button type="button" class="text-xs text-tf-muted hover:text-white" (click)="clearSelection()">Clear</button>
+        <span class="text-xs font-medium text-neutral-400">{{ selectedIds().size }} selected</span>
+        <div class="mx-1 h-4 w-px bg-tf-border"></div>
+        <button type="button" class="rounded-lg bg-tf-green px-3 py-1.5 text-xs font-semibold text-black hover:opacity-90" (click)="bulkSetEnabled(true)">Enable</button>
+        <button type="button" class="rounded-lg border border-tf-border px-3 py-1.5 text-xs text-neutral-300 hover:bg-white/5" (click)="bulkSetEnabled(false)">Disable</button>
+        <button type="button" class="rounded-lg border border-red-500/30 px-3 py-1.5 text-xs text-red-400 hover:bg-red-500/10" (click)="bulkDelete()">Delete</button>
+        <button type="button" class="text-xs text-tf-muted hover:text-neutral-300" (click)="clearSelection()">Clear</button>
       </div>
     }
   `,
@@ -354,6 +393,21 @@ export class WorkflowsPageComponent implements OnInit {
     }
     await this.reload();
     this.toast.success(enabled ? 'Workflows enabled' : 'Workflows disabled');
+  }
+
+  lastRunClass(summary: string): Record<string, boolean> {
+    const s = summary.toLowerCase();
+    return {
+      'bg-emerald-500/10 text-emerald-300': s.includes('success'),
+      'bg-red-500/10 text-red-300': s.includes('fail') || s.includes('error'),
+      'bg-neutral-800 text-neutral-400': !s.includes('success') && !s.includes('fail') && !s.includes('error'),
+    };
+  }
+
+  async toggleReplayMissed(w: WorkflowDto, event: Event): Promise<void> {
+    const checked = (event.target as HTMLInputElement).checked;
+    await this.ipc.api.workflows.setReplayMissed({ id: w.id, replayMissed: checked });
+    w.replay_missed = checked ? 1 : 0;
   }
 
   priorityClass(p: string): Record<string, boolean> {

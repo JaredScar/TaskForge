@@ -22,6 +22,14 @@ const SCOPE_OPTIONS: Array<{ id: string; label: string }> = [
     <div class="max-w-2xl">
       <h1 class="text-xl font-semibold">API Access</h1>
       <p class="mt-1 text-sm text-tf-muted">Trigger workflows programmatically via REST API</p>
+      @if (isViewer()) {
+        <div class="mt-3 flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/8 px-4 py-3 text-sm text-amber-200">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="shrink-0">
+            <path d="M8 2l6 12H2Z"/><path d="M8 7v3"/><circle cx="8" cy="12" r="0.5" fill="currentColor"/>
+          </svg>
+          You have <strong class="font-semibold">Viewer</strong> access — key management is read-only.
+        </div>
+      }
       @if (!ipc.isElectron) {
         <p class="mt-2 text-xs text-amber-200/90">
           Browser preview: the key below is a <strong>dummy</strong> for layout. With <strong>unpackaged</strong> Electron, the same value works for
@@ -35,7 +43,7 @@ const SCOPE_OPTIONS: Array<{ id: string; label: string }> = [
             {{ revealed() ? 'Hide' : 'Show' }}
           </button>
           <button type="button" class="rounded-lg border border-tf-border px-3 py-2 text-xs" (click)="copy()">Copy</button>
-          <button type="button" class="rounded-lg border border-tf-border px-3 py-2 text-xs" (click)="regen()">Regenerate</button>
+          <button type="button" [disabled]="isViewer()" class="rounded-lg border border-tf-border px-3 py-2 text-xs disabled:opacity-50" (click)="regen()">Regenerate</button>
         </div>
         <p class="mt-2 text-xs text-tf-muted">
           Keep your primary key secret. It has full access (<code class="text-[10px] text-neutral-500">*</code> scope). Additional keys below can be
@@ -67,7 +75,7 @@ const SCOPE_OPTIONS: Array<{ id: string; label: string }> = [
             }
           </div>
         }
-        <button type="button" (click)="createScopedKey()" class="mt-4 rounded-lg bg-tf-green px-4 py-2 text-sm font-medium text-black">
+        <button type="button" (click)="createScopedKey()" [disabled]="isViewer()" class="mt-4 rounded-lg bg-tf-green px-4 py-2 text-sm font-medium text-black disabled:opacity-50">
           Create key
         </button>
         @if (lastCreatedToken()) {
@@ -160,6 +168,7 @@ export class ApiAccessPageComponent implements OnInit {
   private readonly confirmDialog = inject(ConfirmDialogService);
   private readonly toast = inject(ToastService);
   private readonly loading = inject(LoadingService);
+  protected readonly isViewer = signal(false);
   protected readonly scopeOptions = SCOPE_OPTIONS;
   private rawKey = '';
   protected readonly revealed = signal(false);
@@ -177,6 +186,16 @@ export class ApiAccessPageComponent implements OnInit {
       this.revealed.set(false);
       await this.reloadKeyList();
     });
+    try {
+      const { unlocked } = await this.ipc.api.entitlement.getStatus();
+      if (unlocked) {
+        const team = (await this.ipc.api.team.list()) as Array<{ is_self: number; role: string }>;
+        const self = team.find((m) => m.is_self === 1);
+        this.isViewer.set(self?.role === 'Viewer');
+      }
+    } catch {
+      /* treat as non-viewer */
+    }
   }
 
   private async reloadKeyList(): Promise<void> {
@@ -201,6 +220,7 @@ export class ApiAccessPageComponent implements OnInit {
   }
 
   async createScopedKey(): Promise<void> {
+    if (this.isViewer()) { this.toast.warning('Viewers cannot create API keys.'); return; }
     this.lastCreatedToken.set('');
     const name = this.newKeyName.trim() || 'API key';
     const scopes = this.newKeyFullAccess()
@@ -248,6 +268,7 @@ export class ApiAccessPageComponent implements OnInit {
   }
 
   async regen(): Promise<void> {
+    if (this.isViewer()) { this.toast.warning('Viewers cannot regenerate the API key.'); return; }
     const ok = await this.confirmDialog.confirm({
       title: 'Regenerate API key',
       message: 'The current key will stop working immediately. Update any scripts or integrations that use it.',

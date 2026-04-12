@@ -103,6 +103,14 @@ function runMigrations(db: InstanceType<typeof BetterSqlite3>): void {
     }
     db.prepare(`INSERT INTO schema_migrations (version, applied_at) VALUES (6, ?)`).run(now);
   }
+  if (maxVer() < 7) {
+    /* §16.2 — per-workflow replay_missed toggle (replaces global-only setting). */
+    const cols = db.prepare(`PRAGMA table_info(workflows)`).all() as { name: string }[];
+    if (!cols.some((c) => c.name === 'replay_missed')) {
+      db.exec(`ALTER TABLE workflows ADD COLUMN replay_missed INTEGER NOT NULL DEFAULT 0`);
+    }
+    db.prepare(`INSERT INTO schema_migrations (version, applied_at) VALUES (7, ?)`).run(now);
+  }
 }
 
 /** Keep primary REST token mirrored in api_keys for scoped API access. */

@@ -13,6 +13,7 @@ export interface WorkflowDto {
   updated_at: string;
   source_template_id?: string | null;
   concurrency?: string | null;
+  replay_missed?: number;
 }
 
 export interface WorkflowNodeDto {
@@ -116,6 +117,7 @@ export interface TaskForgeBridge {
     delete: (id: string) => Promise<boolean>;
     toggle: (id: string) => Promise<boolean>;
     setEnabled: (p: { id: string; enabled: boolean }) => Promise<boolean>;
+    setReplayMissed: (p: { id: string; replayMissed: boolean }) => Promise<boolean>;
     createFromStarter: (p: { mode: 'trigger' | 'action'; kind: string; displayTitle: string }) => Promise<string>;
     appendNode: (p: {
       workflowId: string;

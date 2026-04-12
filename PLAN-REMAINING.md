@@ -2,7 +2,7 @@
 
 > **Source of truth for scope:** [PLAN.md](./PLAN.md) (full product plan, history, and acceptance notes).  
 > **This file:** a **backlog-only** view — items **not** fully done per §22 and follow-up notes. Update both when you ship features.  
-> **Last synced:** 2026-04-11 (UI modernization + remaining-plan pass: log purge wired, loading states all pages, empty states team, new-logs nudge, *tfProIf wired into analytics + AI assistant)
+> **Last synced:** 2026-04-11 (RBAC pass: Settings + API Access + AI Assistant Viewer guards; §16.1 app-launch poll replaced with targeted `tasklist` on Windows; §16.2 per-workflow `replay_missed` toggle + DB migration v7; workflow card UI modernization)
 
 ---
 
@@ -38,8 +38,8 @@
 | 1 | Visual graph canvas builder (pan/zoom, edges, engine follows graph) | §3.3 | **Partial:** list-order edges persisted + topological run order in engine when edges exist. **Not started:** free-form canvas / branching UI. |
 | 4 | AI conversation / multi-turn polish | §10.3 | **Partial:** **"Refine last draft"** updates the same workflow via `workflows.update` (no new workflow). Further polish always possible. |
 | 5 | Multiple API keys + scopes | §12.1, §12.2 | **Partial:** scoped keys + enforcement existed; **added** `workflows:write` + `POST /v1/workflows`. |
-| 8 | Trigger state persistence + missed-trigger replay | §16.2 | **Partial:** `trigger_state` + **optional `replay_missed_cron`** (one catch-up vs previous cron tick after reload). |
-| 9 | Role-based UI (Viewer vs Editor/Admin) | §11.3 | **Partial:** Builder + **Variables** route guard; **Logs** clear, **Team** invite, **Triggers/Actions** catalog create/append blocked for Viewers; Workflows already had viewer UX. |
+| 8 | Trigger state persistence + missed-trigger replay | §16.2 | **✅ Shipped 2026-04-11:** `trigger_state` table (migration v5). `replayMissedCronIfEnabled` respects BOTH global `replay_missed_cron` setting AND per-workflow `replay_missed` flag (migration v7). Toggle visible in each workflow card. |
+| 9 | Role-based UI (Viewer vs Editor/Admin) | §11.3 | **✅ Shipped 2026-04-11:** Settings page (save AI/prefs/license all disabled + read-only banner); API Access (regen + create key disabled + banner); AI Assistant (send/create blocked). Previously: Builder, Variables, Logs, Team, Catalog. |
 | 11 | Settings — remainder after backup ZIP | §14.1 | Same as Phase 1 row — now fully shipped. |
 | 12 | Online license validation (full product story) | §20.9 | Partial: **last verified** timestamp on successful online check + Settings/Team display of seats / valid-until. **Hosted license API + full §20.9.6** out of repo. |
 
@@ -68,7 +68,7 @@
 | AI heuristic parser breadth + confidence | §10.4 | **Expanded keywords + confidence score + UI hint** ✅; further tuning always possible. |
 | Audit log filtering (action type, date range, resource type) | §13.2 | **Date range + status + existing filters + empty state + toast export** ✅. |
 | §13.1 narrative vs code | §13.1 | Plan text predates `writeAuditLog`; treat "missing IPC coverage" as **verify + extend** if any mutation lacks audit. |
-| App launch trigger efficiency | §16.1 | `trigger_poll_interval_ms` is now a configurable setting (default 5 000 ms). |
+| App launch trigger efficiency | §16.1 | **✅ Improved 2026-04-11:** `pollResources()` now uses targeted `tasklist /FI IMAGENAME eq <name>` on Windows (much lighter than full `si.processes()` list). `trigger_poll_interval_ms` is configurable (default 5 000 ms, min 1 000 ms). |
 | Loading states across pages | §21.3 | **✅ Shipped 2026-04-11:** `loading.run()` wired on variables, team, api-access, analytics, audit-logs, marketplace, and logs pages. All pages now show the shell progress bar on first load. |
 | Empty states component on list pages | §21.4 | **✅ Shipped 2026-04-11:** team page (no members / only-self states). Previously on: workflows, logs, variables, audit-logs, marketplace. |
 | Logs UX | §6.1 | **✅ Shipped 2026-04-11:** sticky "↑ N new logs — click to load" nudge banner appears when `onLogsNew` fires while `<main>` is scrolled > 120 px. Clicking scrolls to top and reloads. |

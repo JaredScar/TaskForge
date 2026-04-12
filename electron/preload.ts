@@ -32,6 +32,7 @@ contextBridge.exposeInMainWorld('taskForge', {
     delete: (id: string) => inv('workflows:delete', id),
     toggle: (id: string) => inv('workflows:toggle', id),
     setEnabled: (payload: { id: string; enabled: boolean }) => inv<boolean>('workflows:setEnabled', payload),
+    setReplayMissed: (payload: { id: string; replayMissed: boolean }) => inv<boolean>('workflows:setReplayMissed', payload),
     createFromStarter: (payload: { mode: 'trigger' | 'action'; kind: string; displayTitle: string }) =>
       inv<string>('workflows:createFromStarter', payload),
     appendNode: (payload: { workflowId: string; nodeType: 'trigger' | 'condition' | 'action'; kind: string }) =>

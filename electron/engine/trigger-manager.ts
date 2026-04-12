@@ -1,10 +1,14 @@
 import type Database from 'better-sqlite3';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import CronExpressionParser from 'cron-parser';
 import * as schedule from 'node-schedule';
 import chokidar from 'chokidar';
 import type { FSWatcher } from 'chokidar';
 import * as si from 'systeminformation';
 import { powerMonitor } from 'electron';
+
+const execFileAsync = promisify(execFile);
 
 type TriggerRow = { workflow_id: string; node_id: string; kind: string; config: string };
 import type { AutomationEngine } from './automation-engine';
@@ -140,12 +144,28 @@ export class TriggerManager {
     return row?.value ?? defaultVal;
   }
 
-  /** If `replay_missed_cron` is on, run once when the last fire is before the previous scheduled cron tick (§16.2). */
+  /**
+   * Replay missed cron fires on startup (§16.2).
+   * A workflow is eligible if EITHER:
+   *   - The global `replay_missed_cron` setting is enabled, OR
+   *   - The workflow itself has `replay_missed = 1`
+   */
   private replayMissedCronIfEnabled(rows: TriggerRow[]): void {
-    const on = this.getSetting('replay_missed_cron', '0');
-    if (on !== '1' && on !== 'true') return;
+    const globalOn = this.getSetting('replay_missed_cron', '0');
+    const globalEnabled = globalOn === '1' || globalOn === 'true';
 
-    const cronRows = rows.filter((r) => r.kind === 'time_schedule');
+    const cronRows = rows.filter((r) => {
+      if (r.kind !== 'time_schedule') return false;
+      if (globalEnabled) return true;
+      try {
+        const wf = this.db
+          .prepare(`SELECT replay_missed FROM workflows WHERE id = ?`)
+          .get(r.workflow_id) as { replay_missed: number } | undefined;
+        return (wf?.replay_missed ?? 0) === 1;
+      } catch {
+        return false;
+      }
+    });
     for (const r of cronRows) {
       let config: Record<string, unknown> = {};
       try {
@@ -256,16 +276,31 @@ export class TriggerManager {
     this.pollTimer = setInterval(() => void this.pollResources(), intervalMs);
   }
 
+  /**
+   * Targeted process check — avoids listing every running process.
+   * On Windows: uses `tasklist /FI` which filters at the OS level (much lighter than si.processes()).
+   * On other platforms: falls back to si.processes() scoped to the specific needle.
+   */
+  private async isProcessRunning(needle: string): Promise<boolean> {
+    if (process.platform === 'win32') {
+      try {
+        const exeName = needle.trim().toLowerCase().endsWith('.exe') ? needle.trim() : `${needle.trim()}.exe`;
+        const { stdout } = await execFileAsync('tasklist', ['/FI', `IMAGENAME eq ${exeName}`, '/NH', '/FO', 'CSV']);
+        return stdout.toLowerCase().includes(exeName.toLowerCase());
+      } catch {
+        /* fallback below */
+      }
+    }
+    try {
+      const procs = await si.processes();
+      return (procs.list ?? []).some((p) => processMatchesConfig(needle, p.name));
+    } catch {
+      return false;
+    }
+  }
+
   private async pollResources(): Promise<void> {
     try {
-      let procList: { name: string }[] = [];
-      try {
-        const procs = await si.processes();
-        procList = procs.list ?? [];
-      } catch {
-        procList = [];
-      }
-
       const launchRows = this.db
         .prepare(
           `SELECT w.id as workflow_id, n.id as node_id, n.config FROM workflows w
@@ -283,7 +318,7 @@ export class TriggerManager {
         }
         const procNeedle = String(c['process'] ?? '');
         if (!procNeedle.trim()) continue;
-        const running = procList.some((p) => processMatchesConfig(procNeedle, p.name));
+        const running = await this.isProcessRunning(procNeedle);
         const key = `${r.workflow_id}:${r.node_id}`;
         const was = this.appLaunchWasRunning.get(key) ?? false;
         if (running && !was) {

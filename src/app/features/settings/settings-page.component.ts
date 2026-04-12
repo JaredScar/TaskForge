@@ -4,6 +4,7 @@ import { ActivatedRoute } from '@angular/router';
 import { IpcService } from '../../core/services/ipc.service';
 import { ToastService } from '../../core/services/toast.service';
 import { ConfirmDialogService } from '../../core/services/confirm-dialog.service';
+import { LoadingService } from '../../core/services/loading.service';
 
 @Component({
   selector: 'app-settings-page',
@@ -15,6 +16,14 @@ import { ConfirmDialogService } from '../../core/services/confirm-dialog.service
         <h1 class="text-xl font-semibold">Settings</h1>
         <p class="mt-1 text-sm text-tf-muted">Application preferences (stored locally)</p>
       </div>
+      @if (isViewer()) {
+        <div class="flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/8 px-4 py-3 text-sm text-amber-200">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="shrink-0">
+            <path d="M8 2l6 12H2Z"/><path d="M8 7v3"/><circle cx="8" cy="12" r="0.5" fill="currentColor"/>
+          </svg>
+          You have <strong class="font-semibold">Viewer</strong> access — settings are read-only.
+        </div>
+      }
       @if (showUnlockBanner()) {
         <div class="rounded-xl border border-amber-500/35 bg-amber-500/10 p-4 text-sm text-amber-100">
           Add a valid <strong class="font-medium text-amber-50">organization license key</strong> below to unlock AI Assistant,
@@ -43,7 +52,7 @@ import { ConfirmDialogService } from '../../core/services/confirm-dialog.service
           placeholder="Paste organization license key…"
         />
         <div class="mt-3 flex flex-wrap gap-2">
-          <button type="button" (click)="saveEntitlement()" class="rounded-lg bg-tf-green px-4 py-2 text-sm font-medium text-black">
+          <button type="button" (click)="saveEntitlement()" [disabled]="isViewer()" class="rounded-lg bg-tf-green px-4 py-2 text-sm font-medium text-black disabled:opacity-50">
             Save license
           </button>
           <button
@@ -148,7 +157,7 @@ import { ConfirmDialogService } from '../../core/services/confirm-dialog.service
             autocomplete="off"
           />
         }
-        <button type="button" (click)="saveAiSettings()" class="mt-4 rounded-lg bg-tf-green px-4 py-2 text-sm font-medium text-black">
+        <button type="button" (click)="saveAiSettings()" [disabled]="isViewer()" class="mt-4 rounded-lg bg-tf-green px-4 py-2 text-sm font-medium text-black disabled:opacity-50">
           Save AI settings
         </button>
         @if (savedAiSettings()) {
@@ -209,7 +218,7 @@ import { ConfirmDialogService } from '../../core/services/confirm-dialog.service
           <input type="checkbox" [(ngModel)]="confirmDeleteWorkflow" />
           Confirm before deleting workflows
         </label>
-        <button type="button" (click)="savePrefs()" class="mt-4 rounded-lg bg-tf-green px-4 py-2 text-sm font-medium text-black">
+        <button type="button" (click)="savePrefs()" [disabled]="isViewer()" class="mt-4 rounded-lg bg-tf-green px-4 py-2 text-sm font-medium text-black disabled:opacity-50">
           Save preferences
         </button>
         @if (savedPrefs()) {
@@ -247,7 +256,7 @@ import { ConfirmDialogService } from '../../core/services/confirm-dialog.service
           <input type="checkbox" [(ngModel)]="builderShowJsonDefault" />
           Builder: open “Show JSON” by default for node config
         </label>
-        <button type="button" (click)="savePrefs()" class="mt-4 rounded-lg bg-tf-green px-4 py-2 text-sm font-medium text-black">
+        <button type="button" (click)="savePrefs()" [disabled]="isViewer()" class="mt-4 rounded-lg bg-tf-green px-4 py-2 text-sm font-medium text-black disabled:opacity-50">
           Save preferences
         </button>
       </div>
@@ -314,6 +323,8 @@ export class SettingsPageComponent implements OnInit {
   private readonly toast = inject(ToastService);
   private readonly route = inject(ActivatedRoute);
   private readonly confirm = inject(ConfirmDialogService);
+  private readonly loading = inject(LoadingService);
+  protected readonly isViewer = signal(false);
 
   protected openaiKey = '';
   /** Matches `electron/ai-workflow.ts` defaults. */
@@ -349,7 +360,17 @@ export class SettingsPageComponent implements OnInit {
   protected readonly licenseSeats = signal<number | null>(null);
 
   async ngOnInit(): Promise<void> {
-    await this.loadSettingsForm();
+    await this.loading.run(() => this.loadSettingsForm());
+    try {
+      const { unlocked } = await this.ipc.api.entitlement.getStatus();
+      if (unlocked) {
+        const team = (await this.ipc.api.team.list()) as Array<{ is_self: number; role: string }>;
+        const self = team.find((m) => m.is_self === 1);
+        this.isViewer.set(self?.role === 'Viewer');
+      }
+    } catch {
+      /* no team data — free user, treat as non-viewer */
+    }
   }
 
   private async loadSettingsForm(): Promise<void> {
@@ -446,6 +467,7 @@ export class SettingsPageComponent implements OnInit {
   }
 
   async saveAiSettings(): Promise<void> {
+    if (this.isViewer()) { this.toast.warning('Viewers cannot change settings.'); return; }
     await this.ipc.api.settings.set('ai_provider', this.aiProvider);
     await this.ipc.api.settings.set('openai_api_key', this.openaiKey);
     await this.ipc.api.settings.set('local_ai_base_url', this.localAiBaseUrl.trim());
@@ -457,6 +479,7 @@ export class SettingsPageComponent implements OnInit {
   }
 
   async savePrefs(): Promise<void> {
+    if (this.isViewer()) { this.toast.warning('Viewers cannot change settings.'); return; }
     await this.ipc.api.settings.set('log_retention_days', String(this.logRetentionDays));
     await this.ipc.api.settings.set('log_retention_forever', this.logRetentionForever ? '1' : '0');
     await this.ipc.api.settings.set('clear_logs_on_startup', this.clearLogsOnStartup ? '1' : '0');

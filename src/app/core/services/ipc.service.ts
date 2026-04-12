@@ -219,6 +219,12 @@ export class IpcService {
           persistDevMockToStorage(mockWorkflows, mockWorkflowNodes);
           return true;
         },
+        setReplayMissed: async (p) => {
+          const w = mockWorkflows.find((x) => x.id === p.id);
+          if (w) w.replay_missed = p.replayMissed ? 1 : 0;
+          persistDevMockToStorage(mockWorkflows, mockWorkflowNodes);
+          return true;
+        },
         createFromStarter: async (p: { mode: 'trigger' | 'action'; kind: string; displayTitle: string }) => {
           const id = crypto.randomUUID();
           mockWorkflows.push({
