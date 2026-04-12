@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { IpcService } from '../../core/services/ipc.service';
@@ -18,6 +18,7 @@ type MarketplaceItem = {
 @Component({
   selector: 'app-marketplace-page',
   imports: [FormsModule, EmptyStateComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div>
       <div class="flex flex-wrap items-center justify-between gap-3">

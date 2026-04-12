@@ -9,6 +9,7 @@ import { registerIpcHandlers } from './ipc-handlers';
 import { startApiServer } from './api-server';
 import { readStoredEntitlementKey } from './entitlement';
 import { getLicenseApiUrl, getLicenseMode, refreshLicenseOnline } from './license-remote';
+import { purgeOldLogs } from './db/log-retention';
 
 const isDev = process.argv.includes('--dev');
 
@@ -220,6 +221,10 @@ void app
     } catch (e) {
       console.error('[taskforge] clear_logs_on_startup failed', e);
     }
+
+    purgeOldLogs(db);
+    const MS_PER_DAY = 24 * 60 * 60 * 1000;
+    setInterval(() => purgeOldLogs(db), MS_PER_DAY);
 
     const engine = new AutomationEngine(
       db,

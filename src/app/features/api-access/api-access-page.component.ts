@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { IpcService } from '../../core/services/ipc.service';
 import { ConfirmDialogService } from '../../core/services/confirm-dialog.service';
@@ -16,6 +16,7 @@ const SCOPE_OPTIONS: Array<{ id: string; label: string }> = [
 @Component({
   selector: 'app-api-access-page',
   imports: [FormsModule],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="max-w-2xl">
       <h1 class="text-xl font-semibold">API Access</h1>

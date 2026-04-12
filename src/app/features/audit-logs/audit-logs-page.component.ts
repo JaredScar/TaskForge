@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { IpcService } from '../../core/services/ipc.service';
 import { ToastService } from '../../core/services/toast.service';
@@ -17,6 +17,7 @@ interface AuditRow {
 @Component({
   selector: 'app-audit-logs-page',
   imports: [FormsModule, EmptyStateComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div>
       <div class="flex flex-wrap items-center justify-between gap-3">

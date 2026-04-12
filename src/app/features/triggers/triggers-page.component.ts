@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { IpcService } from '../../core/services/ipc.service';
 import { ToastService } from '../../core/services/toast.service';
@@ -26,6 +26,7 @@ const ADVANCED: TriggerItem[] = [
 
 @Component({
   selector: 'app-triggers-page',
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="max-w-4xl">
       <h1 class="text-xl font-semibold">Triggers</h1>

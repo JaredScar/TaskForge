@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { IpcService } from '../../core/services/ipc.service';
@@ -8,6 +8,7 @@ import { ConfirmDialogService } from '../../core/services/confirm-dialog.service
 @Component({
   selector: 'app-settings-page',
   imports: [FormsModule],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="max-w-lg space-y-8">
       <div>

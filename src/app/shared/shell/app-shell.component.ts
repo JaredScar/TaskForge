@@ -1,4 +1,4 @@
-import { Component, HostListener, OnDestroy, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, HostListener, OnInit, inject, signal } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { NgClass } from '@angular/common';
 import { IpcService } from '../../core/services/ipc.service';
@@ -16,10 +16,12 @@ import { TASKFORGE_UPGRADE_URL } from '../../core/constants/product-urls';
   imports: [RouterOutlet, RouterLink, RouterLinkActive, NgClass],
   templateUrl: './app-shell.component.html',
   styleUrl: './app-shell.component.css',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class AppShellComponent implements OnInit, OnDestroy {
+export class AppShellComponent implements OnInit {
   private readonly ipc = inject(IpcService);
   private readonly router = inject(Router);
+  private readonly destroyRef = inject(DestroyRef);
   protected readonly toast = inject(ToastService);
   protected readonly confirmDialog = inject(ConfirmDialogService);
   protected readonly loading = inject(LoadingService);
@@ -53,16 +55,15 @@ export class AppShellComponent implements OnInit, OnDestroy {
         const tp = await this.ipc.api.settings.get('toast_position');
         if (tp === 'top' || tp === 'bottom') this.toastPosition.set(tp);
       } catch {
-        /* ignore */
+        /* ignore — non-critical UI preference; defaults are acceptable */
       }
     }
     await this.refreshCounts();
     await this.maybeOnboarding();
     this.timer = setInterval(() => void this.refreshCounts(), 5000);
-  }
-
-  ngOnDestroy(): void {
-    if (this.timer) clearInterval(this.timer);
+    this.destroyRef.onDestroy(() => {
+      if (this.timer) clearInterval(this.timer);
+    });
   }
 
   @HostListener('document:keydown', ['$event'])
@@ -147,8 +148,8 @@ export class AppShellComponent implements OnInit, OnDestroy {
       if (list.length > 0) return;
       if (typeof localStorage !== 'undefined' && localStorage.getItem('taskforge_onboarding_done')) return;
       await this.router.navigate(['/onboarding']);
-    } catch {
-      /* ignore */
+    } catch (e) {
+      console.warn('[app-shell] refreshCounts failed', e);
     }
   }
 

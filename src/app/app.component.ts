@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { IpcService } from './core/services/ipc.service';
 
@@ -6,6 +6,7 @@ import { IpcService } from './core/services/ipc.service';
   selector: 'app-root',
   imports: [RouterOutlet],
   template: '<router-outlet />',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AppComponent implements OnInit {
   private readonly ipc = inject(IpcService);

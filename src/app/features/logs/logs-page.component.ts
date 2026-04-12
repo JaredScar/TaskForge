@@ -1,4 +1,4 @@
-import { Component, DestroyRef, OnDestroy, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -65,6 +65,7 @@ function upsertLiveStep(steps: LiveStepLine[], line: LiveStepLine): LiveStepLine
 @Component({
   selector: 'app-logs-page',
   imports: [FormsModule, EmptyStateComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div>
       <div class="flex flex-wrap items-center justify-between gap-3">
@@ -309,7 +310,7 @@ function upsertLiveStep(steps: LiveStepLine[], line: LiveStepLine): LiveStepLine
     </div>
   `,
 })
-export class LogsPageComponent implements OnInit, OnDestroy {
+export class LogsPageComponent implements OnInit {
   private readonly ipc = inject(IpcService);
   private readonly confirmDialog = inject(ConfirmDialogService);
   private readonly toast = inject(ToastService);
@@ -339,6 +340,10 @@ export class LogsPageComponent implements OnInit, OnDestroy {
     });
     void this.reload();
     this.disposeLogs = this.ipc.api.app.onLogsNew(() => void this.reload());
+    this.destroyRef.onDestroy(() => {
+      this.disposeLogs?.();
+      this.disposeStep?.();
+    });
     this.disposeStep = this.ipc.api.logs.onStepProgress((step) => {
       const logId = String(step['logId'] ?? '');
       if (!logId) return;
@@ -409,11 +414,6 @@ export class LogsPageComponent implements OnInit, OnDestroy {
 
   protected dismissFinishedLiveSessions(): void {
     this.liveSessions.update((sessions) => sessions.filter((s) => s.phase !== 'finished'));
-  }
-
-  ngOnDestroy(): void {
-    this.disposeLogs?.();
-    this.disposeStep?.();
   }
 
   protected onFilterChange(v: string): void {

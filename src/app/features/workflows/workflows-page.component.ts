@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { NgClass, TitleCasePipe } from '@angular/common';
@@ -29,6 +29,7 @@ interface LastRunDetail {
 @Component({
   selector: 'app-workflows-page',
   imports: [FormsModule, RouterLink, NgClass, TitleCasePipe, EmptyStateComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="flex flex-col gap-4 pb-16">
       <div class="flex flex-wrap items-center justify-between gap-3">

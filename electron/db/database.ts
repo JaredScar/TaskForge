@@ -150,6 +150,7 @@ function ensureAppDefaults(db: InstanceType<typeof BetterSqlite3>): void {
     ['builder_show_json_default', '0'],
     ['max_concurrent_workflows', '5'],
     ['confirm_delete_workflow', '1'],
+    ['trigger_poll_interval_ms', '5000'],
   ];
   const ins = db.prepare(`INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)`);
   for (const [k, v] of defaults) {

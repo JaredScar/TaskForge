@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { IpcService } from '../../core/services/ipc.service';
 import { ToastService } from '../../core/services/toast.service';
@@ -31,6 +31,7 @@ const NAME_PATTERN = /^[A-Za-z][A-Za-z0-9_]*$/;
 @Component({
   selector: 'app-variables-page',
   imports: [FormsModule, EmptyStateComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [
     `
       .tf-var-field-invalid {

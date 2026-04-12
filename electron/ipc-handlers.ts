@@ -816,6 +816,7 @@ export function registerIpcHandlers(
       ['builder_show_json_default', '0'],
       ['max_concurrent_workflows', '5'],
       ['confirm_delete_workflow', '1'],
+      ['trigger_poll_interval_ms', '5000'],
     ];
     for (const [k, v] of defaults) {
       db.prepare(`INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)`).run(k, v);

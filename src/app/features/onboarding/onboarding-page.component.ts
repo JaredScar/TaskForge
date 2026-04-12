@@ -1,9 +1,10 @@
-import { Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { Router } from '@angular/router';
 
 @Component({
   selector: 'app-onboarding-page',
   imports: [],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="mx-auto max-w-2xl">
       <div class="flex flex-col items-center text-center sm:items-start sm:text-left">

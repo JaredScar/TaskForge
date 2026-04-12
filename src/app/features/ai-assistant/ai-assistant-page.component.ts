@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { IpcService } from '../../core/services/ipc.service';
@@ -41,6 +41,7 @@ function trimConversationForModel(turns: ChatTurn[]): ChatTurn[] {
 @Component({
   selector: 'app-ai-assistant-page',
   imports: [FormsModule, RouterLink],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="mx-auto max-w-2xl">
       <div class="flex items-center gap-3">

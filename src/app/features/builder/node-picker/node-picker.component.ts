@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, Output, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ToastService } from '../../../core/services/toast.service';
 import { NODE_CATALOG, type CatalogNodeType, type NodeCatalogEntry } from '../../../shared/constants/node-catalog';
@@ -13,6 +13,7 @@ function defaultConfigForKind(nodeType: CatalogNodeType, kind: string): Record<s
 @Component({
   selector: 'app-node-picker',
   imports: [FormsModule],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" (click.self)="cancel.emit()">
       <div
@@ -23,7 +24,8 @@ function defaultConfigForKind(nodeType: CatalogNodeType, kind: string): Record<s
           <h2 class="text-sm font-semibold">Add node</h2>
           <input
             type="search"
-            [(ngModel)]="q"
+            [ngModel]="q()"
+            (ngModelChange)="q.set($event)"
             placeholder="Search…"
             class="mt-3 w-full rounded-lg border border-tf-border bg-tf-bg px-3 py-2 text-sm"
           />
@@ -51,8 +53,8 @@ function defaultConfigForKind(nodeType: CatalogNodeType, kind: string): Record<s
                 type="button"
                 (click)="attemptPick(e)"
                 class="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm hover:bg-tf-bg"
-                [class.opacity-45]="e.tier === 'pro' && !proUnlocked()"
-                [class.cursor-not-allowed]="e.tier === 'pro' && !proUnlocked()"
+                [class.opacity-45]="e.tier === 'pro' && !proUnlocked()()"
+                [class.cursor-not-allowed]="e.tier === 'pro' && !proUnlocked()()"
               >
                 <span class="text-xl">{{ e.icon }}</span>
                 <span class="min-w-0 flex-1">
@@ -61,7 +63,7 @@ function defaultConfigForKind(nodeType: CatalogNodeType, kind: string): Record<s
                 </span>
                 @if (e.tier === 'pro') {
                   <span class="flex shrink-0 items-center gap-1">
-                    @if (!proUnlocked()) {
+                    @if (!proUnlocked()()) {
                       <span class="text-sm" title="Requires Pro license">🔒</span>
                     }
                     <span class="rounded bg-tf-green/20 px-1.5 py-0.5 text-[10px] text-tf-green">Pro</span>
@@ -83,15 +85,15 @@ function defaultConfigForKind(nodeType: CatalogNodeType, kind: string): Record<s
 export class NodePickerComponent {
   private readonly toast = inject(ToastService);
 
-  @Input({ required: true }) proUnlocked!: () => boolean;
-  @Output() readonly picked = new EventEmitter<{
+  readonly proUnlocked = input.required<() => boolean>();
+  readonly picked = output<{
     nodeType: CatalogNodeType;
     kind: string;
     config: Record<string, unknown>;
   }>();
-  @Output() readonly cancel = new EventEmitter<void>();
+  readonly cancel = output<void>();
 
-  protected q = '';
+  protected readonly q = signal('');
   protected readonly typeFilter = signal<'all' | CatalogNodeType>('all');
   protected readonly typeFilters: { v: 'all' | CatalogNodeType; label: string }[] = [
     { v: 'all', label: 'All' },
@@ -101,7 +103,7 @@ export class NodePickerComponent {
   ];
 
   protected readonly grouped = computed(() => {
-    const query = this.q.trim().toLowerCase();
+    const query = this.q().trim().toLowerCase();
     const tf = this.typeFilter();
     let list = [...NODE_CATALOG];
     if (tf !== 'all') list = list.filter((e) => e.nodeType === tf);
@@ -123,7 +125,7 @@ export class NodePickerComponent {
   });
 
   attemptPick(e: NodeCatalogEntry): void {
-    if (e.tier === 'pro' && !this.proUnlocked()) {
+    if (e.tier === 'pro' && !this.proUnlocked()()) {
       this.toast.warning('This node requires a Pro license — add your organization key in Settings (Unlock).');
       return;
     }

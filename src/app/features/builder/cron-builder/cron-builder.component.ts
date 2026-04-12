@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, OnChanges, Output, SimpleChanges, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, effect, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 const PRESETS: { label: string; cron: string }[] = [
@@ -11,6 +11,7 @@ const PRESETS: { label: string; cron: string }[] = [
 @Component({
   selector: 'app-cron-builder',
   imports: [FormsModule],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="space-y-3 rounded-lg border border-tf-border bg-tf-bg p-3">
       <p class="text-[10px] font-medium uppercase text-tf-muted">Schedule</p>
@@ -27,7 +28,7 @@ const PRESETS: { label: string; cron: string }[] = [
       </div>
       <label class="block text-xs text-tf-muted">Cron expression</label>
       <input
-        [(ngModel)]="cronLocal"
+        [ngModel]="cronLocal()"
         (ngModelChange)="onCronChange($event)"
         class="w-full rounded border border-tf-border bg-tf-card px-2 py-1.5 font-mono text-xs"
         spellcheck="false"
@@ -36,27 +37,29 @@ const PRESETS: { label: string; cron: string }[] = [
     </div>
   `,
 })
-export class CronBuilderComponent implements OnChanges {
-  @Input({ required: true }) cron = '0 9 * * *';
-  @Output() readonly cronChange = new EventEmitter<string>();
+export class CronBuilderComponent {
+  readonly cron = input.required<string>();
+  readonly cronChange = output<string>();
 
   protected readonly presets = PRESETS;
-  protected cronLocal = '0 9 * * *';
+  protected readonly cronLocal = signal('0 9 * * *');
   protected readonly humanPreview = signal('');
 
-  ngOnChanges(ch: SimpleChanges): void {
-    if (ch['cron']) {
-      this.cronLocal = this.cron || '0 9 * * *';
-      this.humanPreview.set(describeCron(this.cronLocal));
-    }
+  constructor() {
+    effect(() => {
+      const val = this.cron() || '0 9 * * *';
+      this.cronLocal.set(val);
+      this.humanPreview.set(describeCron(val));
+    });
   }
 
   applyPreset(c: string): void {
-    this.cronLocal = c;
+    this.cronLocal.set(c);
     this.push(c);
   }
 
   onCronChange(v: string): void {
+    this.cronLocal.set(v);
     this.push(v);
   }
 

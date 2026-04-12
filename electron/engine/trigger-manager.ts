@@ -251,7 +251,9 @@ export class TriggerManager {
 
   private ensurePollLoop(): void {
     if (this.pollTimer) return;
-    this.pollTimer = setInterval(() => void this.pollResources(), 5000);
+    const raw = (this.db.prepare(`SELECT value FROM settings WHERE key = 'trigger_poll_interval_ms'`).get() as { value: string } | undefined)?.value;
+    const intervalMs = Math.max(1000, parseInt(raw ?? '5000', 10) || 5000);
+    this.pollTimer = setInterval(() => void this.pollResources(), intervalMs);
   }
 
   private async pollResources(): Promise<void> {
