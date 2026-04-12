@@ -2,7 +2,7 @@
 
 > **Source of truth for scope:** [PLAN.md](./PLAN.md) (full product plan, history, and acceptance notes).  
 > **This file:** a **backlog-only** view — items **not** fully done per §22 and follow-up notes. Update both when you ship features.  
-> **Last synced:** 2026-04-11 (§10.3 AI conversation history thread + clear chat; §12.2 api_keys.last_used_at tracked + shown in table; §13.1 audit data:clearUserData + entitlement:refreshOnline; DB migration v8; Phase 3 rows 4, 5, 8, 9 marked ✅ in PLAN.md §22)
+> **Last synced:** 2026-04-11 (§3.3 Visual graph canvas builder shipped; §10.3 AI conversation history thread; §12.2 api_keys.last_used_at; §13.1 audit gaps; DB migrations v5–v8; Phase 3 rows 1, 4, 5, 8, 9 marked ✅ in PLAN.md §22)
 
 ---
 
@@ -31,11 +31,11 @@
 
 ---
 
-## Phase 3 — mostly complete ✅
+## Phase 3 — complete ✅
 
 | # | Task | PLAN § | Status |
 |---|------|--------|--------|
-| 1 | Visual graph canvas builder (pan/zoom, edges, engine follows graph) | §3.3 | **Still open:** list-order edges + topological engine exist. Free-form canvas / drag-to-connect UI **not started** — V2 feature. |
+| 1 | Visual graph canvas builder (pan/zoom, edges, engine follows graph) | §3.3 | **✅ Shipped 2026-04-11:** SVG canvas with pan/zoom (wheel + drag), draggable node cards at stored `position_x/y`, bezier edges, port-to-port connect (click output port → click target), arrowheads, edge selection + Delete, auto-layout, Fit view, dot-grid background. Actual edges persisted on save; engine already does topological sort via edges. |
 | 4 | AI conversation / multi-turn polish | §10.3 | **✅ Shipped 2026-04-11:** Chat bubble thread renders `conversation` signal; typing indicator; "Clear chat"; "Refine last draft" updates same workflow; follow-up placeholder; suggestions hidden after first turn. |
 | 5 | Multiple API keys + scopes | §12.1, §12.2 | **✅ Shipped 2026-04-11:** Scoped keys + scope checkboxes + one-time token display. `last_used_at` tracked in `api-server.ts` and shown in API Access table (DB migration v8). |
 | 8 | Trigger state persistence + missed-trigger replay | §16.2 | **✅ Shipped 2026-04-11:** `trigger_state` table (migration v5). Per-workflow `replay_missed` toggle in card (migration v7). Engine respects both global setting and per-workflow flag. |
@@ -57,7 +57,7 @@
 
 ## Phase 4 — future platform (§22)
 
-(Visual canvas §3.3, cloud sync, license server §20.9.6, per-seat enforcement, community marketplace, mobile app, plugin system — see PLAN.md §22 Phase 4.)
+(Cloud sync, license server §20.9.6, per-seat enforcement, community marketplace, mobile app, plugin system — see PLAN.md §22 Phase 4.)
 
 ---
 
@@ -79,7 +79,6 @@
 
 | Item | Why open |
 |------|----------|
-| §3.3 Visual graph canvas | V2 engineering effort — SVG/canvas drag-to-connect not started |
 | §20.9 Full online license validation | Requires hosted license API outside this repo |
 | §20.8 Per-seat enforcement | Requires hosted license API + seat DB |
 
@@ -87,7 +86,7 @@
 
 ## Explicitly **not** listed here (done per §22 — do not duplicate)
 
-Examples: queue/stats, onboarding, toasts, confirm dialog, builder picker + schemas + validation + cron helper, variable interpolation + `{{var}}` / `{{context.*}}`, duplicate/bulk workflows, marketplace remote + installed state, Chart.js analytics, log filters URL + export, IPC typing/errors, most triggers/actions including Pro catalog, keyboard shortcuts, post-run refresh, last-run panel on cards, etc. See **PLAN.md §22** for the full done matrix.
+Examples: visual canvas (§3.3 ✅ shipped), queue/stats, onboarding, toasts, confirm dialog, builder picker + schemas + validation + cron helper, variable interpolation + `{{var}}` / `{{context.*}}`, duplicate/bulk workflows, marketplace remote + installed state, Chart.js analytics, log filters URL + export, IPC typing/errors, most triggers/actions including Pro catalog, keyboard shortcuts, post-run refresh, last-run panel on cards, etc. See **PLAN.md §22** for the full done matrix.
 
 ---
 

@@ -1193,11 +1193,11 @@ Complete all partially-built features and add the missing interactions.
 | 24 | IPC error handling | §19.2 | ✅ Done (`ipcHandle` + envelope + preload + `ipc-error.ts`) |
 
 ### Phase 3 — V2 Visual Builder & Advanced Features (4–6 weeks)
-The flagship visual canvas builder and advanced integrations.
+**Note (2026-04-11):** All Phase 3 items are ✅ Done. Remaining open: §20.9 full online license validation and §20.8 per-seat enforcement — both require a hosted license API outside this repo.
 
 | # | Task | Section |
 |---|---|---|
-| 1 | Visual graph canvas builder | §3.3 |
+| 1 | Visual graph canvas builder | §3.3 | ✅ Done (SVG canvas, pan/zoom, draggable nodes at position_x/y, bezier edges, port-to-port connect, arrowheads, edge select + Delete, auto-layout, Fit, dot-grid background; actual edges persisted; engine topological sort already in place) |
 | 2 | Real-time log step progress | §6.2 · ✅ Done (live panel + `logs:new` on run start) |
 | 3 | Workflow run history inline panel | §2.2 · ✅ Done (last run panel on workflow cards) |
 | 4 | AI conversation history | §10.3 · ✅ Done (chat bubble thread, typing indicator, clear chat, follow-up placeholder, suggestions hidden after first turn; “Refine last draft” path updates existing workflow) |
