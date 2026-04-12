@@ -1193,7 +1193,7 @@ Complete all partially-built features and add the missing interactions.
 | 24 | IPC error handling | §19.2 | ✅ Done (`ipcHandle` + envelope + preload + `ipc-error.ts`) |
 
 ### Phase 3 — V2 Visual Builder & Advanced Features (4–6 weeks)
-**Note (2026-04-11):** All Phase 3 items are ✅ Done. Remaining open: §20.9 full online license validation and §20.8 per-seat enforcement — both require a hosted license API outside this repo.
+**Note (2026-04-12):** All Phase 3 items are ✅ Done. §20.9 is now partially implemented in this repo (online refresh + cached grace UX); remaining open: the full end-to-end policy and §20.8 per-seat enforcement — both require a hosted license API outside this repo.
 
 | # | Task | Section |
 |---|---|---|

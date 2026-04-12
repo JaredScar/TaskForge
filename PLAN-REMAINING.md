@@ -79,7 +79,7 @@
 
 | Item | Why open |
 |------|----------|
-| §20.9 Full online license validation | Requires hosted license API outside this repo |
+| §20.9 Full online license validation | Partially implemented: online refresh while app is open + Settings UX for cached grace; remaining end-to-end correctness depends on hosted license API outside this repo |
 | §20.8 Per-seat enforcement | Requires hosted license API + seat DB |
 
 ---
