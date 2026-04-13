@@ -28,6 +28,14 @@
   "build": {
     "appId": "app.taskforge.desktop",
     "productName": "TaskForge",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "JaredScar",
+        "repo": "TaskForge",
+        "releaseType": "release"
+      }
+    ],
     "directories": {
       "output": "release"
     },

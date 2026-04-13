@@ -10,6 +10,7 @@ import { startApiServer } from './api-server';
 import { readStoredEntitlementKey } from './entitlement';
 import { getLicenseApiUrl, getLicenseMode, refreshLicenseOnline } from './license-remote';
 import { purgeOldLogs } from './db/log-retention';
+import type { UpdateCheckResult } from 'electron-updater';
 
 const isDev = process.argv.includes('--dev');
 
@@ -262,6 +263,17 @@ void app
     createTray();
 
     if (app.isPackaged) {
+      try {
+        // Prefer the stable GitHub Release channel (not pre-releases).
+        autoUpdater.setFeedURL({
+          provider: 'github',
+          owner: process.env.TASKFORGE_UPDATE_GITHUB_OWNER ?? 'JaredScar',
+          repo: process.env.TASKFORGE_UPDATE_GITHUB_REPO ?? 'TaskForge',
+          releaseType: 'release',
+        } as any);
+      } catch {
+        /* if provider misconfigured, fall back to defaults */
+      }
       autoUpdater.checkForUpdatesAndNotify().catch(() => undefined);
     }
 
