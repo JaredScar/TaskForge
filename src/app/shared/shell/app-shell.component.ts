@@ -9,7 +9,7 @@ import { HotkeysService } from '../../core/services/hotkeys.service';
 import type { ToastLevel } from '../../core/services/toast.service';
 import { LEGACY_ONBOARDING_DONE_STORAGE_KEY } from '../../core/legacy-onboarding-key';
 import type { AppStats } from '../../../types/ipc-channels';
-import { TASKFORGE_UPGRADE_URL } from '../../core/constants/product-urls';
+import { FORGETASK_UPGRADE_URL } from '../../core/constants/product-urls';
 
 @Component({
   selector: 'app-shell',
@@ -46,7 +46,7 @@ export class AppShellComponent implements OnInit {
   private timer: ReturnType<typeof setInterval> | null = null;
 
   /** External marketing URL for sidebar upgrade card (see `product-urls.ts`). */
-  protected readonly upgradeUrl = TASKFORGE_UPGRADE_URL;
+  protected readonly upgradeUrl = FORGETASK_UPGRADE_URL;
 
   async ngOnInit(): Promise<void> {
     this.migrateLegacyOnboardingKey();
